@@ -2,8 +2,9 @@ import pandas as pd, pickle, shutil, tempfile
 from pathlib import Path
 from datetime import datetime
 from catboost import CatBoostRegressor
-from retrain.utils import preprocess, fit_scaler
-from utils.ncp_client import upload_file
+from icu_discharge.retrain.utils import preprocess
+from icu_discharge.retrain.utils.ncp_client import upload_file
+
 
 SELF = Path(__file__).parent
 ARCHIVE_DIR = SELF.parent.parent / "data" / "archive"
@@ -16,7 +17,6 @@ def load_archive():
 def main():
     df = load_archive()
     y  = df.pop("discharge_flag")
-    fit_scaler(df)
     X  = preprocess(df)
     cat_idx = [X.columns.get_loc("ward_code")]
 

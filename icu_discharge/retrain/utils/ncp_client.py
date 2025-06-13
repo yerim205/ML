@@ -1,13 +1,17 @@
 # utils/ncp_client.py
-
+import sys
 from pathlib import Path
 import os
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
-# 1) .env 로드 (실행 스크립트 최상위 위치에 .env가 있어야 함)
-env_path = Path(__file__).parent.parent / ".env"
+# 프로젝트 루트를 시스템 경로에 추가
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent / ".env"
+sys.path.append(str(PROJECT_ROOT))
+
+# .env 경로 설정
+env_path = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
 # 2) 환경변수 읽기
@@ -15,7 +19,7 @@ NCP_ACCESS_KEY = os.getenv("NCP_ACCESS_KEY")
 NCP_SECRET_KEY = os.getenv("NCP_SECRET_KEY")
 NCP_REGION     = os.getenv("NCP_REGION", "kr-standard")
 NCP_ENDPOINT   = os.getenv("NCP_ENDPOINT", "https://kr.object.ncloudstorage.com")
-NCP_BUCKET     = os.getenv("NCP_BUCKET")
+NCP_BUCKET     = os.getenv("NCP_BUCKET_NAME")
 
 if not all([NCP_ACCESS_KEY, NCP_SECRET_KEY, NCP_BUCKET]):
     raise ValueError("NCP_ACCESS_KEY, NCP_SECRET_KEY, NCP_BUCKET 환경변수가 설정되어 있지 않습니다.")
