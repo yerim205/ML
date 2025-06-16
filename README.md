@@ -10,7 +10,7 @@
 | ------- | ----------------------- | ------------------------------------- |
 | Model 1 | `/transfer/recommend`   | 질병 코드와 병상 현황을 기반으로 최적의 전실 병동 Top-K 추천 |
 | Model 2 | `/congestion/recommend` | 혼잡도(혼잡 여부 및 확률)를 예측하는 ICU 상태 기반 모델    |
-| Model 3 | `/discharge/recommend`  | 퇴실 가능 환자에 대한 예측 점수를 반환하는 모델           |
+| Model 3 | `/discharge/recommend`  | 퇴실 가능 환자에 대한 예측값을 반환하는 모델           |
 
 ---
 
