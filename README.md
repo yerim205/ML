@@ -167,13 +167,6 @@
 
 * `images/congestion_request.png`
 * `images/discharge_request.png`
-
-README 내에 이미지를 렌더링하려면:
-
-```markdown
-![최적 병동 전실 예측 요청](images/transfer_request.png)
-![혼잡도 예측 요청](images/congestion_request.png)
-![퇴실 예측 요청](images/discharge_request.png)
-```
+* `images/transfer_request.png`
 
 ---
