@@ -1,83 +1,63 @@
-# # recommend/icu_congestion_recommend.py
-# import os
-# import pandas as pd
-# from pathlib import Path
-# from joblib import load
-# from datetime import datetime
-
-# from recommend.hybrid_scheduler import HybridScheduler
-
-# from utils.column_mapping import COLUMN_MAPPING
-# from utils.preprocess import preprocess
-
-# ROOT = Path(__file__).parent.parent
-# MODEL_PATH = ROOT / "model/model2.pkl"
-
-# def recommend(data: dict) -> dict:
-#     """ICU 병동 혼잡도 예측 API"""
-#     # 모델 로드
-#     model = load(MODEL_PATH)
-#     result = model.recommend(data)
-
-    
-#     # 입력 데이터 처리
-#     df = pd.DataFrame([data])
-#     # 침상 수 계산
-#     required_cols = ['embdCct','dschCct','useSckbCnt','admsApntCct','chupCct']
-#     if all(col in df.columns for col in required_cols):
-#         df['total_beds'] = df[required_cols].sum(axis=1)
-    
-#     # 컬럼 매핑 및 전처리
-#     df.rename(columns=COLUMN_MAPPING, inplace=True)
-#     X = preprocess(df)
-    
-#     # 예측 실행
-#     pred = model.predict(X)[0]
-#     proba = model.predict_proba(X)[0][1]
-    
-#     return {
-#         'prediction': int(pred),
-#         'probability': float(proba),
-#         'timestamp': datetime.now().isoformat()
-#     }
+# recommend/icu_congestion_recommend.py
 from pathlib import Path
+from joblib import load
 from datetime import datetime
-import pandas as pd
 
-from utils.column_mapping import COLUMN_MAPPING
-from utils.preprocess import preprocess
+from utils.db_loader import (
+    get_realtime_data_for_today,
+    get_realtime_data_for_days_ago
+)
+from utils.preprocess import (
+    parse_model23_input,
+    generate_model2_features
+)
 
+# ─── 스마트 모델 로드 경로 설정 ───
 ROOT = Path(__file__).parent.parent
-MODEL_PATH = ROOT / "model/model2.pkl"
+MODEL_PATH = ROOT / "model" / "model2.pkl"
 
-# 모델을 한 번만 로드하는 전역 변수
-model = None
+# ─── ICU 혼잡도 예측 API 함수 ───
+def recommend(_: dict) -> dict:
+    """
+    ICU 혼잡도 예측 전처 API
 
-def load_model():
-    global model
-    if model is None:
-        from joblib import load
-        model = load(MODEL_PATH)
+    Returns:
+    - {
+        "prediction": 예측 범위,
+        "probability": 가능성,
+        "timestamp": 시간
+      }
+    """
+    # (1) 데이터 로드
+    today_jsons = get_realtime_data_for_today()
+    lag1_jsons = get_realtime_data_for_days_ago(1)
+    lag7_jsons = get_realtime_data_for_days_ago(7)
 
-def recommend(data: dict) -> dict:
-    """ICU 병동 혼잡도 예측 API"""
-    load_model()
+    # (2) 패시 및 DataFrame 변환
+    df_today = parse_model23_input(today_jsons)
+    df_lag1 = parse_model23_input(lag1_jsons)
+    df_lag7 = parse_model23_input(lag7_jsons)
 
-    # HybridScheduler 객체라면 recommend 메서드 사용
-    if hasattr(model, 'recommend') and callable(getattr(model, 'recommend')):
-        return model.recommend(data)
+    if df_today.empty or df_lag1.empty or df_lag7.empty:
+        return {
+            "error": "일별 데이터에 의미있는 기본 정보가 보장되지 않았습니다.",
+            "timestamp": datetime.now().isoformat()
+        }
 
-    # 일반 sklearn 모델일 경우
-    df = pd.DataFrame([data])
-    required_cols = ['embdCct','dschCct','useSckbCnt','admsApntCct','chupCct']
-    if all(col in df.columns for col in required_cols):
-        df['total_beds'] = df[required_cols].sum(axis=1)
-    df.rename(columns=COLUMN_MAPPING, inplace=True)
-    X = preprocess(df)
-    pred = model.predict(X)[0]
-    proba = model.predict_proba(X)[0][1]
+    # (3) 피처 생성
+    target_date = datetime.now()
+    X = generate_model2_features(df_today, df_lag1, df_lag7, target_date)
+
+    # (4) 모델 로드
+    model_data = load(MODEL_PATH)
+    cat_model = model_data['cat_model']
+
+    # (5) 예측
+    pred = cat_model.predict(X)[0]
+    proba = cat_model.predict_proba(X)[0][1]
+
     return {
-        'prediction': int(pred),
-        'probability': float(proba),
-        'timestamp': datetime.now().isoformat()
+        "prediction": int(pred),
+        "probability": float(proba),
+        "timestamp": datetime.now().isoformat()
     }

@@ -115,5 +115,15 @@ def model3_retrain():
     shutil.copy(MODEL_PATH, ARCHIVE_MODEL_DIR / f"icu_congestion_{ts}.pkl")
     print("ICU Congestion retrain success:", MODEL_PATH)
 
+    # ─── 8) NCP Object Storage 업로드 ─────────────────
+    object_key = f"icu_congestion_models/icu_congestion_{ts}.pkl"
+    try:
+        s3.upload_file(str(MODEL_PATH), S3_BUCKET, object_key)
+        s3.put_object_acl(ACL="public-read", Bucket=S3_BUCKET, Key=object_key)
+        print("업로드 완료:", object_key)
+    except Exception as e:
+        print("업로드 실패:", e)
+
+
 if __name__ == "__main__":
     model3_retrain()

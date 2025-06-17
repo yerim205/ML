@@ -95,13 +95,12 @@
     "occ_rate_lag1": 0.85,
     "occ_rate_lag7": 0.83,
     "is_weekend": 0,
-    "is_public_holiday": 1,
-    "month": 6,
-    "quarter": 2
+    "is_public_holiday": 1, #제거 함
+    "month": 6, # 제거함 
+    "quarter": 2 # 제거함
   }
 }
 ```
-
 * **예시 응답:**
 
 ```json
@@ -130,13 +129,13 @@
     "prev_week_dis": 15,
     "morning_ratio": 0.6,
     "afternoon_ratio": 0.4,
-    "avg_age": 67.5,
-    "male_ratio": 0.55,
-    "female_ratio": 0.45,
-    "dow": 0,
+    "avg_age": 67.5, # 제거함
+    "male_ratio": 0.55, # 제거함
+    "female_ratio": 0.45, # 제거함 
+    "dow": 0, #요일을 숫자로 범주화 한 것
     "is_weekend": 0,
-    "is_public_holiday": 0,
-    "mon": 6,
+    "is_public_holiday": 0, #제거함
+    "mon": 6, # 제거 함
     "ward_code": "ICU1"
   }
 }

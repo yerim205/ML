@@ -93,3 +93,50 @@ def discharge_endpoint(req: RecommendRequest) -> RecommendResponse:
 @app.get("/")
 async def root():
     return {"message": "RMPR AI Unified API is running!"}
+
+"""
+# main.py
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from typing import Dict, Any
+from utils.ncp_client import load_pickle_from_ncp
+from recommend.top3_transfer_recommend import recommend as transfer_recommend
+from recommend.icu_congestion_recommend import recommend as congestion_recommend
+from recommend.icu_discharge_recommend import recommend as discharge_recommend
+
+# ─── 모델 로드 ─────
+model1 = load_pickle_from_ncp("model/model1.pkl")
+model2 = load_pickle_from_ncp("model/model2.pkl")
+model3 = load_pickle_from_ncp("model/model3.pkl")
+
+# FastAPI 앱 생성
+app = FastAPI()
+
+class RecommendRequest(BaseModel):
+    data: Dict[str, Any]
+
+class RecommendResponse(BaseModel):
+    result: Any
+
+@app.post("/transfer/recommend", response_model=RecommendResponse)
+def transfer_recommend_endpoint(req: RecommendRequest):
+    try:
+        return RecommendResponse(result=transfer_recommend(req.data))
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+@app.post("/congestion/recommend", response_model=RecommendResponse)
+def congestion_recommend_endpoint(req: RecommendRequest):
+    try:
+        return RecommendResponse(result=congestion_recommend(req.data))
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+@app.post("/discharge/recommend", response_model=RecommendResponse)
+def discharge_recommend_endpoint(req: RecommendRequest):
+    try:
+        return RecommendResponse(result=discharge_recommend(req.data))
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+"""
