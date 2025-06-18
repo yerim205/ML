@@ -5,9 +5,10 @@ from typing import Any, Dict, Callable
 from recommend.hybrid_scheduler import HybridScheduler
 
 # 추천 함수만 임포트
-from recommend.top3_transfer_recommend import recommend as transfer_recommend
 from recommend.icu_congestion_recommend import recommend as congestion_recommend
-from recommend.icu_discharge_recommend import recommend as discharge_recommend
+from recommend.icu_discharge_recommend import auto_recommend  
+from recommend.top3_transfer_recommend import auto_transfer_recommend
+
 
 app = FastAPI()
 
@@ -38,62 +39,48 @@ def handle_recommendation(
         raise HTTPException(status_code=500, detail=f"추천 오류: {e}")
     
 # ─── model1: top3_transfer ────────────────────────
-@app.post("/transfer/recommend", response_model=RecommendResponse)
-def transfer_recommend_endpoint(req: RecommendRequest):
+@app.get("/transfer/recommend", response_model=RecommendResponse)
+def auto_transfer_recommend():
     try:
-        body = req.data
-
-        # 1. ICD 코드 추출
-        raw_diss = body["dissInfo"][0]["dissCd"]
-        icd = extract_icd(raw_diss)
-
-        # 2. 병상 정보 추출
-        bed_rows: List[Dict[str, Any]] = []
-        for ptrm in body.get("ptrmInfo", []):
-            for ctrl in ptrm.get("ptntDtlsCtrlAllLst", []):
-                for ward in ctrl.get("wardLst", []):
-                    bed_rows.append({
-                        "ward":        ward.get("wardCd"),
-                        "embdCct":     ward.get("embdCct", 0),
-                        "dschCct":     ward.get("dschCct", 0),
-                        "useSckbCnt":  ward.get("useSckbCnt", 0),
-                        "admsApntCct": ward.get("admsApntCct", 0),
-                        "chupCct":     ward.get("chupCct", 0)
-                    })
-
-        topk = body.get("topK", 3)
-
-        # 3. 추천 호출
-        result = transfer_recommend({
-            "dissCd": icd,
-            "bedInfo": bed_rows,
-            "topK": topk
-        })
+        from recommend.top3_transfer_recommend import auto_transfer_recommend
+        result = auto_transfer_recommend()
         return RecommendResponse(result=result)
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(500, detail=str(e))
 
 # --- model2: icu_congestion ---
-@app.post("/congestion/recommend", response_model=RecommendResponse)
-def model2_recommend(req: RecommendRequest):
+
+@app.get("/congestion/recommend", response_model=RecommendResponse)
+def model2_recommend_auto() -> RecommendResponse:
     try:
-        res = congestion_recommend(req.data)
-        # res = congestion_scheduler.recommend(req.data)
+        from recommend.icu_congestion_recommend import auto_recommend
+        result = auto_recommend()
+        return RecommendResponse(result=result)
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+
+# --- model3: icu_discharge ---
+
+@app.get("/discharge/recommend", response_model=RecommendResponse)
+def model3_auto_endpoint():
+    try:
+        res = auto_recommend()
     except Exception as e:
         raise HTTPException(500, detail=str(e))
     return RecommendResponse(result=res)
 
-# --- model3: icu_discharge ---
-@app.post("/discharge/recommend", response_model=RecommendResponse)
-def discharge_endpoint(req: RecommendRequest) -> RecommendResponse:
-    return handle_recommendation(discharge_recommend, req)
 
 @app.get("/")
 async def root():
-    return {"message": "RMPR AI Unified API is running!"}
-
+    return {
+        "message": "RMRP AI Unified API is running!",
+        "endpoints": [
+            "/transfer/recommend",
+            "/congestion/recommend",
+            "/discharge/recommend"
+        ]
+    }
 """
 # main.py
 

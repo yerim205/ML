@@ -1,13 +1,17 @@
-#recommend/icu_discharge_recommend.py 
-#6월 17일 수정 중
+# recommend/icu_discharge_recommend.py
+import traceback  # ← 추가
+from utils.db_loader import (
+    get_latest_realtime_data,
+    get_latest_realtime_data_for_days_ago,
+    safe_get_realtime_data_for_today
+)
+from utils.preprocess import parse_model23_input
 from pathlib import Path
 from joblib import load
+from datetime import datetime, time
 import pandas as pd
-from datetime import datetime
-from utils.preprocess import parse_model23_input
-from utils.db_loader import get_realtime_data_for_today
 
-# 모델 경로 설정
+# 모델 파일 경로
 ROOT = Path(__file__).parent.parent
 MODEL_PATH = ROOT / "model" / "model3.pkl"
 
@@ -15,133 +19,138 @@ MODEL_PATH = ROOT / "model" / "model3.pkl"
 def load_discharge_model():
     model_data = load(MODEL_PATH)
     return (
-        model_data["cat_model"],     # 예측 모델
-        model_data["scaler"],        # 스케일러
-        model_data["num_imputer"],   # 결측값 대치기
-        model_data["num_cols"],      # 수치형 컬럼 리스트
-        model_data["cat_col"]        # 범주형 컬럼 리스트
+        model_data["cat_model"],
+        model_data["scaler"],
+        model_data["num_imputer"],
+        model_data["num_cols"],
+        model_data["cat_col"]
     )
 
-# 아침/오후 입원 비율 요약 함수
+# 시간대별 입원 요약 함수
 def summarize_admissions_by_time(realtime_jsons: list[dict], ward_code: str) -> dict:
     morning = 0
     afternoon = 0
-
     for data in realtime_jsons:
         timestamp = data.get("_timestamp")
         if not timestamp:
             continue
-
-        wards = [
-            w for ptrm in data.get("ptrmInfo", [])
-            for ptnt in ptrm.get("ptntDtlsCtrlAllLst", [])
-            for w in ptnt.get("wardLst", [])
-            if w.get("wardCd") == ward_code
-        ]
-
-        if not wards:
-            continue
-
-        hour = timestamp.hour
-        if 6 <= hour < 12:
-            morning += 1
-        elif 12 <= hour < 18:
-            afternoon += 1
-
+        for ptrm in data.get("ptrmInfo", []):
+            for ptnt in ptrm.get("ptntDtlsCtrlAllLst", []):
+                for w in ptnt.get("wardLst", []):
+                    if w.get("wardCd") == ward_code:
+                        hour = timestamp.hour
+                        if 6 <= hour < 12:
+                            morning += 1
+                        elif 12 <= hour < 18:
+                            afternoon += 1
     total = morning + afternoon
     return {
         "morning_ratio": morning / total if total else 0.5,
         "afternoon_ratio": afternoon / total if total else 0.5
     }
 
-# 예측 API 함수
-def recommend(input_data: dict) -> dict:
-    """
-    ICU 전체 퇴원자 수 예측
 
-    Parameters:
-    - input_data: {
-        "realtime": dict,  # 병상 원시 데이터
-        "admissions": int,
-        "prev_dis": int,
-        "prev_week_dis": int,
-        "dow": int,
-        "is_weekend": int,
-        "ward_code": str
-      }
+def auto_recommend() -> dict:
+    try:
+        # 1. 모델 로딩
+        model, scaler, imputer, num_cols, cat_col = load_discharge_model()
 
-    Returns:
-    - {
-        "prediction": float,
-        "timestamp": str
-      }
-    """
-    # 1. 모델 로딩
-    cat_model, scaler, num_imputer, num_cols, cat_col = load_discharge_model()
+        # 2. 기준 날짜 추출
+        latest_json = get_latest_realtime_data()
+        base_ts = latest_json.get("_timestamp", datetime.now())
+        print("🕒 get_latest_realtime_data 기준 timestamp:", base_ts)
 
-    # 2. 병상 정보 파싱 및 파생변수 생성
-    ward_data = parse_model23_input(input_data["realtime"])
-    df = pd.DataFrame(ward_data)
-    df = df[df["wardCd"] == input_data["ward_code"]].copy()
+        base_date = base_ts.date()
+        print("📅 기준 base_date:", base_date)
 
-    if df.empty:
-        raise ValueError("해당 ward_code에 해당하는 병상 데이터가 없습니다.")
 
-    df["total_beds"] = df[["embdCct", "dschCct", "useSckbCnt", "admsApntCct", "chupCct"]].sum(axis=1)
-    total_beds = df["total_beds"].iloc[0] if not df.empty else 1
-    occupancy_rate = df["useSckbCnt"].iloc[0] / total_beds if total_beds > 0 else 0
+        # 3. 오늘/전일/일주일 전 실시간 병상 데이터 로딩
+        today_raw = safe_get_realtime_data_for_today()
+        lag1_raw = [get_latest_realtime_data_for_days_ago(1)]
+        lag7_raw = [get_latest_realtime_data_for_days_ago(7)]
 
-    # 3. 시간대 기반 입원 비율 계산
-    today_data = get_realtime_data_for_today()
-    ward_code = input_data["ward_code"]
-    latest_ward_data = next(
-    (
-        d for d in reversed(today_data)
-        if any(
-            w.get("wardCd") == ward_code
-            for ptrm in d.get("ptrmInfo", [])
-            for ptnt in ptrm.get("ptntDtlsCtrlAllLst", [])
-            for w in ptnt.get("wardLst", [])
-        )
-         ),
-        None
-        )
-    
-    if not latest_ward_data or "_timestamp" not in latest_ward_data:
-        raise ValueError("해당 ward_code에 대한 유효한 timestamp가 없습니다.")
+        print("📅 날짜 기준:", base_date)
+        print("✅ today_raw 길이:", len(today_raw))
+        print("✅ lag1_raw 길이:", len(lag1_raw))
+        print("✅ lag7_raw 길이:", len(lag7_raw))
 
-    ts = latest_ward_data["_timestamp"]
-    dow = ts.weekday()
-    is_weekend = int(dow >= 5)
+        # 4. 파싱
+        today_df = pd.DataFrame([w for d in today_raw for w in parse_model23_input(d)])
+        lag1_df = pd.DataFrame([w for d in lag1_raw for w in parse_model23_input(d)])
+        lag7_df = pd.DataFrame([w for d in lag7_raw for w in parse_model23_input(d)])
 
-    adm_summary = summarize_admissions_by_time(today_data, input_data["ward_code"])
+        print("📊 today_df columns:", today_df.columns)
+        print("📊 lag1_df columns:", lag1_df.columns)
+        print("📊 lag7_df columns:", lag7_df.columns)
 
-    # 4. 최종 feature dict 구성
-    features = {
-        "admissions": input_data["admissions"],
-        "prev_dis": input_data["prev_dis"],
-        "prev_week_dis": input_data["prev_week_dis"],
-        "dow": input_data["dow"],
-        "is_weekend": input_data["is_weekend"],
-        "ward_code": input_data["ward_code"],
-        "occupancy_rate": occupancy_rate,
-        "morning_ratio": adm_summary["morning_ratio"],
-        "afternoon_ratio": adm_summary["afternoon_ratio"]
-    }
+        if today_df.empty or "wardCd" not in today_df.columns:
+            raise ValueError("❌ today_df가 비어있거나 'wardCd'가 없습니다.")
 
-    # 5. 피처 필터링 및 전처리
-    filtered_features = {
-        k: v for k, v in features.items()
-        if k in num_cols + cat_col
-    }
-    df_feat = pd.DataFrame([filtered_features])
-    df_feat[num_cols] = num_imputer.transform(df_feat[num_cols])
-    df_feat[num_cols] = scaler.transform(df_feat[num_cols])
+        # ✅ early return 조건: 이전 데이터 부족 시
+        if lag1_df.empty or "wardCd" not in lag1_df.columns:
+            return {
+                "predictions": [],
+                "timestamp": base_ts.isoformat(),
+                "warning": "전일 데이터가 부족하여 예측을 수행하지 않았습니다."
+            }
 
-    # 6. 예측
-    pred = cat_model.predict(df_feat)[0]
+        if lag7_df.empty or "wardCd" not in lag7_df.columns:
+            return {
+                "predictions": [],
+                "timestamp": base_ts.isoformat(),
+                "warning": "일주일 전 데이터가 부족하여 예측을 수행하지 않았습니다."
+            }
 
-    return {
-        "prediction": float(pred),
-        "timestamp": datetime.now().isoformat()
-    }
+        results = []
+        for ward_code in today_df["wardCd"].unique():
+            print(f"➡️ 예측 시작: {ward_code}")
+            ward_rows = today_df[today_df["wardCd"] == ward_code]
+            if ward_rows.empty:
+                continue
+
+            total_beds = ward_rows[["embdCct", "dschCct", "useSckbCnt", "admsApntCct", "chupCct"]].sum(axis=1).iloc[0]
+            occupancy_rate = ward_rows["useSckbCnt"].iloc[0] / total_beds if total_beds else 0
+
+            admissions = ward_rows["admsApntCct"].sum()
+            prev_dis = lag1_df[lag1_df["wardCd"] == ward_code]["dschCct"].sum()
+            prev_week_dis = lag7_df[lag7_df["wardCd"] == ward_code]["dschCct"].sum()
+
+            dow = base_ts.weekday()
+            is_weekend = int(dow >= 5)
+            adm_summary = summarize_admissions_by_time(today_raw, ward_code)
+
+            features = {
+                "admissions": admissions,
+                "prev_dis": prev_dis,
+                "prev_week_dis": prev_week_dis,
+                "dow": dow,
+                "is_weekend": is_weekend,
+                "ward_code": ward_code,
+                "occupancy_rate": occupancy_rate,
+                "morning_ratio": adm_summary["morning_ratio"],
+                "afternoon_ratio": adm_summary["afternoon_ratio"]
+            }
+
+            filtered = {k: v for k, v in features.items() if k in num_cols + cat_col}
+            X = pd.DataFrame([filtered])
+
+            missing_cols = [col for col in num_cols if col not in X.columns]
+            if missing_cols:
+                raise ValueError(f"❌ 수치형 컬럼 누락: {missing_cols}")
+
+            X[num_cols] = imputer.transform(X[num_cols])
+            X[num_cols] = scaler.transform(X[num_cols])
+
+            pred = model.predict(X)[0]
+            results.append({
+                "ward_code": ward_code,
+                "prediction": float(pred)
+            })
+
+        return {
+            "predictions": results,
+            "timestamp": base_ts.isoformat()
+        }
+
+    except Exception as e:
+        raise ValueError(f"자동 예측 오류: {e}")
