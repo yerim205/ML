@@ -104,7 +104,7 @@ def parse_model23_input(realtime_data: dict) -> list[dict]:
                 ward_cd = str(ward.get("wardCd"))
                 if ward_cd in MODEL23_WARD_CODES:
                     parsed = parse_bed_status_counts(ward)
-                    print(f"✅ parsed ward ({ward_cd}):", parsed)
+                    print(f"parsed ward ({ward_cd}):", parsed)
                     result.append(parsed)
     return result
 

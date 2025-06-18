@@ -100,7 +100,7 @@ def get_latest_realtime_data_for_days_ago(n: int) -> dict:
 
     target_date = (datetime.now() - timedelta(days=n)).date()
 
-    print(f"🔍 n일 전 쿼리 호출됨, n={n}, 날짜={target_date}")
+    print(f"n일 전 쿼리 호출됨, n={n}, 날짜={target_date}")
 
     query = text("""
         SELECT ctnt, reg_dtm
@@ -118,12 +118,12 @@ def get_latest_realtime_data_for_days_ago(n: int) -> dict:
         row = conn.execute(query, {"target_date": str(target_date)}).fetchone()
 
     if not row or not row[0]:
-        raise ValueError(f"❌ {target_date}자 병상 API row 자체가 없습니다.")
+        raise ValueError(f"{target_date}자 병상 API row 자체가 없습니다.")
 
     try:
         parsed = json.loads(row[0])
         parsed["_timestamp"] = row[1]  # ✅ row는 conn 닫히기 전에 가져왔기 때문에 OK
-        print(f"✅ 쿼리 결과 timestamp: {row[1]}")
+        print(f"쿼리 결과 timestamp: {row[1]}")
         return parsed
     except Exception as e:
         raise ValueError(f"JSON 파싱 실패: {e}")

@@ -8,7 +8,7 @@ from utils.db_loader import (
 from utils.preprocess import parse_model23_input
 from pathlib import Path
 from joblib import load
-from datetime import datetime, time
+from datetime import datetime
 import pandas as pd
 
 # 모델 파일 경로
@@ -58,10 +58,10 @@ def auto_recommend() -> dict:
         # 2. 기준 날짜 추출
         latest_json = get_latest_realtime_data()
         base_ts = latest_json.get("_timestamp", datetime.now())
-        print("🕒 get_latest_realtime_data 기준 timestamp:", base_ts)
+        print("get_latest_realtime_data 기준 timestamp:", base_ts)
 
         base_date = base_ts.date()
-        print("📅 기준 base_date:", base_date)
+        print("기준 base_date:", base_date)
 
 
         # 3. 오늘/전일/일주일 전 실시간 병상 데이터 로딩
@@ -69,24 +69,24 @@ def auto_recommend() -> dict:
         lag1_raw = [get_latest_realtime_data_for_days_ago(1)]
         lag7_raw = [get_latest_realtime_data_for_days_ago(7)]
 
-        print("📅 날짜 기준:", base_date)
-        print("✅ today_raw 길이:", len(today_raw))
-        print("✅ lag1_raw 길이:", len(lag1_raw))
-        print("✅ lag7_raw 길이:", len(lag7_raw))
+        print("날짜 기준:", base_date)
+        print("today_raw 길이:", len(today_raw))
+        print("lag1_raw 길이:", len(lag1_raw))
+        print("lag7_raw 길이:", len(lag7_raw))
 
         # 4. 파싱
         today_df = pd.DataFrame([w for d in today_raw for w in parse_model23_input(d)])
         lag1_df = pd.DataFrame([w for d in lag1_raw for w in parse_model23_input(d)])
         lag7_df = pd.DataFrame([w for d in lag7_raw for w in parse_model23_input(d)])
 
-        print("📊 today_df columns:", today_df.columns)
-        print("📊 lag1_df columns:", lag1_df.columns)
-        print("📊 lag7_df columns:", lag7_df.columns)
+        print("today_df columns:", today_df.columns)
+        print("lag1_df columns:", lag1_df.columns)
+        print("lag7_df columns:", lag7_df.columns)
 
         if today_df.empty or "wardCd" not in today_df.columns:
-            raise ValueError("❌ today_df가 비어있거나 'wardCd'가 없습니다.")
+            raise ValueError("today_df가 비어있거나 'wardCd'가 없습니다.")
 
-        # ✅ early return 조건: 이전 데이터 부족 시
+        # early return 조건: 이전 데이터 부족 시
         if lag1_df.empty or "wardCd" not in lag1_df.columns:
             return {
                 "predictions": [],
@@ -136,7 +136,7 @@ def auto_recommend() -> dict:
 
             missing_cols = [col for col in num_cols if col not in X.columns]
             if missing_cols:
-                raise ValueError(f"❌ 수치형 컬럼 누락: {missing_cols}")
+                raise ValueError(f" 수치형 컬럼 누락: {missing_cols}")
 
             X[num_cols] = imputer.transform(X[num_cols])
             X[num_cols] = scaler.transform(X[num_cols])
