@@ -2,6 +2,7 @@
 from pathlib import Path
 from joblib import load
 from datetime import datetime
+import pandas as pd
 
 from utils.db_loader import (
     get_realtime_data_for_today,
@@ -34,9 +35,10 @@ def recommend(_: dict) -> dict:
     lag7_jsons = get_realtime_data_for_days_ago(7)
 
     # (2) 패시 및 DataFrame 변환
-    df_today = parse_model23_input(today_jsons)
-    df_lag1 = parse_model23_input(lag1_jsons)
-    df_lag7 = parse_model23_input(lag7_jsons)
+    df_today = pd.DataFrame([row for d in today_jsons for row in parse_model23_input(d)])
+    df_lag1 = pd.DataFrame([row for d in lag1_jsons for row in parse_model23_input(d)])
+    df_lag7 = pd.DataFrame([row for d in lag7_jsons for row in parse_model23_input(d)])
+
 
     if df_today.empty or df_lag1.empty or df_lag7.empty:
         return {

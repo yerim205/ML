@@ -1,78 +1,132 @@
+# from fastapi import FastAPI, HTTPException
+# from pydantic import BaseModel, Field
+# from typing import Any, Dict, Callable
+
+# from recommend.hybrid_scheduler import HybridScheduler
+
+# # 추천 함수만 임포트
+# from recommend.icu_congestion_recommend import recommend as congestion_recommend
+# from recommend.icu_discharge_recommend import auto_recommend  
+# from recommend.top3_transfer_recommend import auto_transfer_recommend
+
+
+
+# app = FastAPI()
+
+# transfer_scheduler = HybridScheduler()
+
+# # ─── 공통 요청/응답 스키마 ─────────────────
+# class RecommendRequest(BaseModel):
+#     data: Dict[str, Any] = Field(
+#         ...,
+#         description="원시 API 요청 바디 전체를 data 로 받습니다."
+#     )
+
+# class RecommendResponse(BaseModel):
+#     result: Any
+
+# def extract_icd(raw_diss: str) -> str:
+#     return raw_diss.strip().upper()
+
+# # ─── 공통 처리 함수 ────────────────────────
+# def handle_recommendation(
+#     recommender: Callable[[Dict[str, Any]], Any], 
+#     req: RecommendRequest
+# ) -> RecommendResponse:
+#     try:
+#         result = recommender(req.data)
+#         return RecommendResponse(result=result)
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"추천 오류: {e}")
+    
+# # ─── model1: top3_transfer ────────────────────────
+# @app.get("/transfer/recommend", response_model=RecommendResponse)
+# def auto_transfer_recommend():
+#     try:
+#         from recommend.top3_transfer_recommend import auto_transfer_recommend
+#         result = auto_transfer_recommend()
+#         return RecommendResponse(result=result)
+#     except Exception as e:
+#         raise HTTPException(500, detail=str(e))
+
+# # --- model2: icu_congestion ---
+
+# @app.get("/congestion/recommend", response_model=RecommendResponse)
+# def model2_recommend_auto() -> RecommendResponse:
+#     try:
+#         from recommend.icu_congestion_recommend import auto_recommend
+#         result = auto_recommend()
+#         return RecommendResponse(result=result)
+#     except Exception as e:
+#         raise HTTPException(500, detail=str(e))
+
+
+# # --- model3: icu_discharge ---
+
+# @app.get("/discharge/recommend", response_model=RecommendResponse)
+# def model3_auto_endpoint():
+#     try:
+#         res = auto_recommend()
+#     except Exception as e:
+#         raise HTTPException(500, detail=str(e))
+#     return RecommendResponse(result=res)
+
+
+# @app.get("/")
+# async def root():
+#     return {
+#         "message": "RMRP AI Unified API is running!",
+#         "endpoints": [
+#             "/transfer/recommend",
+#             "/congestion/recommend",
+#             "/discharge/recommend"
+#         ]
+#     }
+
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import Any, Dict, Callable
+from pydantic import BaseModel
+from typing import Any
 
-from recommend.hybrid_scheduler import HybridScheduler
-
-# 추천 함수만 임포트
-from recommend.icu_congestion_recommend import recommend as congestion_recommend
-from recommend.icu_discharge_recommend import auto_recommend  
 from recommend.top3_transfer_recommend import auto_transfer_recommend
-
+from recommend.icu_congestion_recommend import recommend as congestion_recommend
+from recommend.icu_discharge_recommend import auto_recommend as discharge_recommend
 
 app = FastAPI()
 
-transfer_scheduler = HybridScheduler()
-
-# ─── 공통 요청/응답 스키마 ─────────────────
-class RecommendRequest(BaseModel):
-    data: Dict[str, Any] = Field(
-        ...,
-        description="원시 API 요청 바디 전체를 data 로 받습니다."
-    )
-
+# ─── 공통 응답 스키마 ──────────────────────
 class RecommendResponse(BaseModel):
     result: Any
 
-def extract_icd(raw_diss: str) -> str:
-    return raw_diss.strip().upper()
-
-# ─── 공통 처리 함수 ────────────────────────
-def handle_recommendation(
-    recommender: Callable[[Dict[str, Any]], Any], 
-    req: RecommendRequest
-) -> RecommendResponse:
-    try:
-        result = recommender(req.data)
-        return RecommendResponse(result=result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"추천 오류: {e}")
-    
-# ─── model1: top3_transfer ────────────────────────
+# ─── model1: 전실 추천 ──────────────────────
 @app.get("/transfer/recommend", response_model=RecommendResponse)
-def auto_transfer_recommend():
+def recommend_transfer():
     try:
-        from recommend.top3_transfer_recommend import auto_transfer_recommend
         result = auto_transfer_recommend()
         return RecommendResponse(result=result)
     except Exception as e:
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"전실 추천 오류: {e}")
 
-# --- model2: icu_congestion ---
-
+# ─── model2: ICU 혼잡도 ─────────────────────
 @app.get("/congestion/recommend", response_model=RecommendResponse)
-def model2_recommend_auto() -> RecommendResponse:
+def recommend_congestion():
     try:
-        from recommend.icu_congestion_recommend import auto_recommend
-        result = auto_recommend()
+        result = congestion_recommend({})
         return RecommendResponse(result=result)
     except Exception as e:
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"혼잡도 예측 오류: {e}")
 
-
-# --- model3: icu_discharge ---
-
+# ─── model3: ICU 퇴실 추천 ──────────────────
 @app.get("/discharge/recommend", response_model=RecommendResponse)
-def model3_auto_endpoint():
+def recommend_discharge():
     try:
-        res = auto_recommend()
+        result = discharge_recommend()
+        return RecommendResponse(result=result)
     except Exception as e:
-        raise HTTPException(500, detail=str(e))
-    return RecommendResponse(result=res)
+        raise HTTPException(status_code=500, detail=f"퇴실 추천 오류: {e}")
 
-
+# ─── 루트 엔드포인트 ────────────────────────
 @app.get("/")
-async def root():
+def root():
     return {
         "message": "RMRP AI Unified API is running!",
         "endpoints": [
@@ -80,82 +134,4 @@ async def root():
             "/congestion/recommend",
             "/discharge/recommend"
         ]
-    }
-"""
-# main.py
-
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import Dict, Any
-from utils.ncp_client import load_pickle_from_ncp
-from recommend.top3_transfer_recommend import recommend as transfer_recommend
-from recommend.icu_congestion_recommend import recommend as congestion_recommend
-from recommend.icu_discharge_recommend import recommend as discharge_recommend
-
-# ─── 모델 로드 ─────
-model1 = load_pickle_from_ncp("model/model1.pkl")
-model2 = load_pickle_from_ncp("model/model2.pkl")
-model3 = load_pickle_from_ncp("model/model3.pkl")
-
-# FastAPI 앱 생성
-app = FastAPI()
-
-class RecommendRequest(BaseModel):
-    data: Dict[str, Any]
-
-class RecommendResponse(BaseModel):
-    result: Any
-
-@app.post("/transfer/recommend", response_model=RecommendResponse)
-def transfer_recommend_endpoint(req: RecommendRequest):
-    try:
-        return RecommendResponse(result=transfer_recommend(req.data))
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
-
-@app.post("/congestion/recommend", response_model=RecommendResponse)
-def congestion_recommend_endpoint(req: RecommendRequest):
-    try:
-        return RecommendResponse(result=congestion_recommend(req.data))
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
-
-@app.post("/discharge/recommend", response_model=RecommendResponse)
-def discharge_recommend_endpoint(req: RecommendRequest):
-    try:
-        return RecommendResponse(result=discharge_recommend(req.data))
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
-"""
-
-
-@app.get("/debug/check-db")
-def check_db():
-    from datetime import datetime
-    from sqlalchemy import text
-    from utils.db_loader import engine
-
-    query = text("""
-        SELECT reg_dtm, ctnt
-        FROM rmrp_portal.tb_api_log
-        WHERE req_res = 'REQ'
-          AND com_src_cd = 'CMC03'
-          AND req_url LIKE '%mdcl-rm-rcpt%'
-          AND ctnt IS NOT NULL
-          AND reg_dtm BETWEEN :start_dt AND :end_dt
-        ORDER BY reg_dtm DESC
-        LIMIT 5
-    """)
-    start_dt = datetime(2025, 6, 17, 0, 0, 0)
-    end_dt = datetime(2025, 6, 17, 23, 59, 59)
-
-    with engine.connect() as conn:
-        rows = conn.execute(query, {
-            "start_dt": start_dt,
-            "end_dt": end_dt
-        }).fetchall()
-
-    return {
-        "rows_count": len(rows),
-        "rows": [dict(r._mapping) for r in rows]
     }
