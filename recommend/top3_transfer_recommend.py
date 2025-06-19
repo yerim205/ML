@@ -64,26 +64,6 @@ model: HybridScheduler = load(MODEL_PATH)
 
 #     except Exception as e:
 #         raise ValueError(f"자동 전실 추천 오류: {e}")
-from pathlib import Path
-from joblib import load
-import pandas as pd
-
-from recommend.hybrid_scheduler import HybridScheduler
-from utils.preprocess import parse_model1_input
-from utils.db_loader import get_latest_realtime_data
-
-# ─── ICD 매핑 ─────────────────
-CODE_TO_ICD = {
-    "01": "I21",
-    "02": "I63",
-    "03": "I60",
-    "04": "I71",
-    "05": "I71",
-}
-
-# ─── 모델 로드 ─────────────────
-MODEL_PATH = Path(__file__).parent.parent / "model/model1.pkl"
-model: HybridScheduler = load(MODEL_PATH)
 
 def auto_transfer_recommend() -> dict:
     """

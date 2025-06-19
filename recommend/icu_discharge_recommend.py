@@ -1,5 +1,5 @@
 # recommend/icu_discharge_recommend.py
-import traceback  # ← 추가
+import traceback  
 from utils.db_loader import (
     get_latest_realtime_data,
     get_latest_realtime_data_for_days_ago,
@@ -108,7 +108,7 @@ def auto_recommend() -> dict:
 
         results = []
         for ward_code in today_df["wardCd"].unique():
-            print(f"➡️ 예측 시작: {ward_code}")
+            print(f"예측 시작: {ward_code}")
             ward_rows = today_df[today_df["wardCd"] == ward_code]
             if ward_rows.empty:
                 continue
