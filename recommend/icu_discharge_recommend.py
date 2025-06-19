@@ -3,8 +3,9 @@ import traceback  # ← 추가
 from utils.db_loader import (
     get_latest_realtime_data,
     get_latest_realtime_data_for_days_ago,
-    safe_get_realtime_data_for_today
+    safe_get_realtime_data_for_today,
 )
+
 from utils.preprocess import parse_model23_input
 from pathlib import Path
 from joblib import load
@@ -66,18 +67,22 @@ def auto_recommend() -> dict:
 
         # 3. 오늘/전일/일주일 전 실시간 병상 데이터 로딩
         today_raw = safe_get_realtime_data_for_today()
-        lag1_raw = [get_latest_realtime_data_for_days_ago(1)]
-        lag7_raw = [get_latest_realtime_data_for_days_ago(7)]
+        lag1_json = get_latest_realtime_data_for_days_ago(1, base_ts)
+        lag7_json = get_latest_realtime_data_for_days_ago(7, base_ts)
+
 
         print("날짜 기준:", base_date)
         print("today_raw 길이:", len(today_raw))
-        print("lag1_raw 길이:", len(lag1_raw))
-        print("lag7_raw 길이:", len(lag7_raw))
+        print("lag1_raw 길이:", len(lag1_json))
+        print("lag7_raw 길이:", len(lag7_json))
 
         # 4. 파싱
+        print("parse_model23_input() 호출 시작:", len(today_raw))
+
         today_df = pd.DataFrame([w for d in today_raw for w in parse_model23_input(d)])
-        lag1_df = pd.DataFrame([w for d in lag1_raw for w in parse_model23_input(d)])
-        lag7_df = pd.DataFrame([w for d in lag7_raw for w in parse_model23_input(d)])
+        
+        lag1_df = pd.DataFrame([w for d in [lag1_json] for w in parse_model23_input(d)])
+        lag7_df = pd.DataFrame([w for d in [lag7_json] for w in parse_model23_input(d)])
 
         print("today_df columns:", today_df.columns)
         print("lag1_df columns:", lag1_df.columns)
@@ -153,4 +158,8 @@ def auto_recommend() -> dict:
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # 콘솔에 전체 traceback 출력
         raise ValueError(f"자동 예측 오류: {e}")
+
+

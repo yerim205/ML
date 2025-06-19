@@ -127,3 +127,35 @@ def discharge_recommend_endpoint(req: RecommendRequest):
     except Exception as e:
         raise HTTPException(500, detail=str(e))
 """
+
+
+@app.get("/debug/check-db")
+def check_db():
+    from datetime import datetime
+    from sqlalchemy import text
+    from utils.db_loader import engine
+
+    query = text("""
+        SELECT reg_dtm, ctnt
+        FROM rmrp_portal.tb_api_log
+        WHERE req_res = 'REQ'
+          AND com_src_cd = 'CMC03'
+          AND req_url LIKE '%mdcl-rm-rcpt%'
+          AND ctnt IS NOT NULL
+          AND reg_dtm BETWEEN :start_dt AND :end_dt
+        ORDER BY reg_dtm DESC
+        LIMIT 5
+    """)
+    start_dt = datetime(2025, 6, 17, 0, 0, 0)
+    end_dt = datetime(2025, 6, 17, 23, 59, 59)
+
+    with engine.connect() as conn:
+        rows = conn.execute(query, {
+            "start_dt": start_dt,
+            "end_dt": end_dt
+        }).fetchall()
+
+    return {
+        "rows_count": len(rows),
+        "rows": [dict(r._mapping) for r in rows]
+    }

@@ -96,17 +96,37 @@ def parse_model1_input(realtime_data: dict) -> list[dict]:
 
 
 # ─── 모델 2 & 3 전용 파서 ────────────────────────
+# def parse_model23_input(realtime_data: dict) -> list[dict]:
+#     result = []
+#     for ptrm in realtime_data.get("ptrmInfo", []):
+#         for ptnt in ptrm.get("ptntDtlsCtrlAllLst", []):
+#             for ward in ptnt.get("wardLst", []):
+#                 ward_cd = str(ward.get("wardCd"))
+#                 if ward_cd in MODEL23_WARD_CODES:
+#                     parsed = parse_bed_status_counts(ward)
+#                     print(f"parsed ward ({ward_cd}):", parsed)
+#                     result.append(parsed)
+#     return result
 def parse_model23_input(realtime_data: dict) -> list[dict]:
-    result = []
-    for ptrm in realtime_data.get("ptrmInfo", []):
-        for ptnt in ptrm.get("ptntDtlsCtrlAllLst", []):
-            for ward in ptnt.get("wardLst", []):
-                ward_cd = str(ward.get("wardCd"))
-                if ward_cd in MODEL23_WARD_CODES:
-                    parsed = parse_bed_status_counts(ward)
-                    print(f"parsed ward ({ward_cd}):", parsed)
-                    result.append(parsed)
-    return result
+    print("🛠️ parse_model23_input() 진입")
+    results = []
+    try:
+        for ptrm in realtime_data.get("ptrmInfo", []):
+            #print(" ptrmDvsnCd:", ptrm.get("ptrmDvsnCd"))
+            for ptnt in ptrm.get("ptntDtlsCtrlAllLst", []):
+                for ward in ptnt.get("wardLst", []):
+                    ward_cd = str(ward.get("wardCd"))
+                    #print("wardCd 탐색:", ward_cd)
+
+                    if ward_cd in MODEL23_WARD_CODES:
+                        parsed = parse_bed_status_counts(ward)
+                        #print(" 병상 파싱 성공:", parsed)
+                        results.append(parsed)
+    except Exception as e:
+        #print(" parse_model23_input 내부 에러:", e)
+        raise e
+
+    return results
 
 # ─── 모델 2 전용 파생 변수 생성 ───────────────────
 def generate_model2_features(df_today, df_lag1, df_lag7, target_date):

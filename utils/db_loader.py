@@ -95,36 +95,44 @@ def get_realtime_data_for_days_ago(n: int) -> list[dict]:
 
     return result
 
-def get_latest_realtime_data_for_days_ago(n: int) -> dict:
-    from datetime import datetime, timedelta
+# utils/db_loader.py
+def get_latest_realtime_data_for_days_ago(n: int, base_ts: datetime | None = None) -> dict:
+    """
+    가장 최근 시각(base_ts)을 기준으로 n일 전 데이터를 가져온다.
+    base_ts가 없으면 datetime.now()를 사용(이전 동작과 호환).
+    """
+    if base_ts is None:
+        base_ts = datetime.now()
 
-    target_date = (datetime.now() - timedelta(days=n)).date()
-
-    print(f"n일 전 쿼리 호출됨, n={n}, 날짜={target_date}")
+    target_day = base_ts.date() - timedelta(days=n)
+    start_dt   = datetime.combine(target_day, datetime.min.time())
+    end_dt     = datetime.combine(target_day, datetime.max.time())
 
     query = text("""
-        SELECT ctnt, reg_dtm
-          FROM rmrp_portal.tb_api_log
-         WHERE req_res = 'REQ'
-           AND com_src_cd = 'CMC03'
-           AND req_url LIKE '%mdcl-rm-rcpt%'
-           AND DATE(reg_dtm) = :target_date
-         ORDER BY reg_dtm DESC
-         LIMIT 1
+         SELECT ctnt, reg_dtm
+        FROM rmrp_portal.tb_api_log
+        WHERE req_res = 'REQ'
+        AND com_src_cd = 'CMC03'
+        AND req_url LIKE '%mdcl-rm-rcpt%'
+        AND ctnt IS NOT NULL
+        AND reg_dtm BETWEEN :start_dt AND :end_dt
+        ORDER BY reg_dtm DESC
+        LIMIT 1
     """)
 
-    row = None
     with engine.connect() as conn:
-        row = conn.execute(query, {"target_date": str(target_date)}).fetchone()
+        row = conn.execute(query, {"start_dt": start_dt, "end_dt": end_dt}).fetchone()
+   # print(f"[DEBUG] DB 연결 정보: {engine.url}")
 
-    if not row or not row[0]:
-        raise ValueError(f"{target_date}자 병상 API row 자체가 없습니다.")
+    if not row:
+        raise ValueError(f"{target_day}자 병상 API row 자체가 없습니다.")
+    if not row[0]:
+        raise ValueError(f"{target_day}자 병상 API ctnt 값이 비어 있습니다.")
 
     try:
         parsed = json.loads(row[0])
-        parsed["_timestamp"] = row[1]  # ✅ row는 conn 닫히기 전에 가져왔기 때문에 OK
-        print(f"쿼리 결과 timestamp: {row[1]}")
-        return parsed
+        parsed["_timestamp"] = row[1]
+        return parsed 
     except Exception as e:
         raise ValueError(f"JSON 파싱 실패: {e}")
 
@@ -188,3 +196,6 @@ def safe_get_realtime_data_for_today():
     else:
         print("_timestamp가 누락되어 있음")
         return [latest_data]
+    
+
+    
