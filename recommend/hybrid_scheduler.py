@@ -99,16 +99,42 @@ class HybridScheduler:
         cost = self.compute_cost(icd, ward, state)
         return tau * eta - cost
 
+    # def recommend(self, icd: str, df_live: pd.DataFrame = None, top_k=1) -> list:
+    #     if df_live is not None:
+    #         state = make_state_from_df(df_live)
+    #     else:
+    #         state = {w: {'total': WARD_TOTALS[w], 'occupied': 0} for w in WARD_TOTALS}
+    #     scores = {}
+    #     for w in self.edges.get(icd, []):
+    #         s = state.get(w)
+    #         if not s or s['occupied'] >= s['total']:
+    #             continue
+    #         scores[w] = self.combined_score(icd, w, state)
+    #     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    #     return ranked[:top_k]
     def recommend(self, icd: str, df_live: pd.DataFrame = None, top_k=1) -> list:
         if df_live is not None:
             state = make_state_from_df(df_live)
         else:
             state = {w: {'total': WARD_TOTALS[w], 'occupied': 0} for w in WARD_TOTALS}
+
         scores = {}
-        for w in self.edges.get(icd, []):
-            s = state.get(w)
-            if not s or s['occupied'] >= s['total']:
-                continue
-            scores[w] = self.combined_score(icd, w, state)
+        candidates = self.edges.get(icd, [])
+
+        for w in candidates:
+            if w not in state:
+                 continue  # 해당 ward가 실시간 데이터에 없으면 skip
+
+            score = self.combined_score(icd, w, state)
+            scores[w] = score
+
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+        if not ranked:
+            fallback_scores = {}
+            for w in state:
+                score = self.combined_score(icd, w, state)
+                fallback_scores[w] = score
+            ranked = sorted(fallback_scores.items(), key=lambda x: x[1], reverse=True)
+
         return ranked[:top_k]

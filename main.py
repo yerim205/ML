@@ -116,7 +116,7 @@ def recommend_congestion():
         raise HTTPException(status_code=500, detail=f"혼잡도 예측 오류: {e}")
 
 # ─── model3: ICU 퇴실 추천 ──────────────────
-@app.get("/discharge/recommend", response_model=RecommendResponse)
+@app.post("/discharge/recommend", response_model=RecommendResponse)
 def recommend_discharge():
     try:
         result = discharge_recommend()

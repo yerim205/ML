@@ -154,12 +154,11 @@ def auto_recommend() -> dict:
 
         return {
             "predictions": results,
-            "timestamp": base_ts.isoformat()
         }
 
     except Exception as e:
         import traceback
         traceback.print_exc()  # 콘솔에 전체 traceback 출력
-        raise ValueError(f"자동 예측 오류: {e}")
+        raise ValueError(f"자동 예측 오류: {e}, {"prediction": None}")
 
 

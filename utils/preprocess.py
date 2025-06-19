@@ -73,6 +73,7 @@ def parse_model1_input(realtime_data: dict) -> list[dict]:
         for ptnt in ptrm.get("ptntDtlsCtrlAllLst", []):
             for ward in ptnt.get("wardLst", []):
                 ward_cd = str(ward.get("wardCd"))
+                MODEL1_WARD_CODES = set(WARD_CD_TO_NAME.keys())
                 if ward_cd in MODEL1_WARD_CODES:
                     ward_name = WARD_CD_TO_NAME.get(ward_cd)
                     if not ward_name:
