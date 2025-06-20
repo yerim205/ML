@@ -96,6 +96,10 @@ app = FastAPI()
 # ─── 공통 응답 스키마 ──────────────────────
 class RecommendResponse(BaseModel):
     result: Any
+    
+@app.get("/health-check")
+def recommend_transfer():
+    return "ok"
 
 # ─── model1: 전실 추천 ──────────────────────
 @app.get("/transfer/recommend", response_model=RecommendResponse)
@@ -130,6 +134,7 @@ def root():
     return {
         "message": "RMRP AI Unified API is running!",
         "endpoints": [
+            "/health-check",
             "/transfer/recommend",
             "/congestion/recommend",
             "/discharge/recommend"
