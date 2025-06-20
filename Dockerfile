@@ -1,20 +1,9 @@
 FROM python:3.12.8
 
 ARG P_CURRENT_ACTIVE
-# ARG P_CURRENT_PORT
+ARG P_CURRENT_PORT
 
-RUN if [ "$P_CURRENT_ACTIVE" = "dev" ]; then \
-      export PORT=8000 \
-    elif [ "$P_CURRENT_ACTIVE" = "stg" ]; then \
-      export PORT=8000 \
-    else \
-      export PORT=8000 \
-    fi
-
-# ENV FASTAPI_ROOT_PATH="/edaapi-"${P_CURRENT_ACTIVE}
-
-# ENV PORT=${P_CURRENT_PORT}
-# ENV PORT=8000
+ENV PORT=${P_CURRENT_PORT}
 
 WORKDIR /code
 
