@@ -27,6 +27,7 @@ class RecommendResponse(BaseModel):
     
 @app.get("/health-check")
 async def healthCheck():
+    print("Health Check!")
     return "ok"
 
 # ─── ValidationError 핸들러: success=false 로 반환 ───────
