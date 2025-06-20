@@ -95,7 +95,6 @@ def get_realtime_data_for_days_ago(n: int) -> list[dict]:
 
     return result
 
-# utils/db_loader.py
 def get_latest_realtime_data_for_days_ago(n: int, base_ts: datetime | None = None) -> dict:
     """
     가장 최근 시각(base_ts)을 기준으로 n일 전 데이터를 가져온다.

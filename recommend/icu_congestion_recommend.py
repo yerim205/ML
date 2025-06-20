@@ -17,49 +17,96 @@ from utils.preprocess import (
 ROOT = Path(__file__).parent.parent
 MODEL_PATH = ROOT / "model" / "model2.pkl"
 
-# ─── ICU 혼잡도 예측 API 함수 ───
+# # ─── ICU 혼잡도 예측 API 함수 ───
+# def recommend(_: dict) -> dict:
+#     """
+#     ICU 혼잡도 예측 전처 API
+
+#     Returns:
+#     - {
+#         "prediction": 예측 범위,
+#       }
+#     """
+#     # (1) 데이터 로드
+#     today_jsons = get_realtime_data_for_today()
+#     lag1_jsons = get_realtime_data_for_days_ago(1)
+#     lag7_jsons = get_realtime_data_for_days_ago(7)
+
+#     # (2) 패시 및 DataFrame 변환
+#     df_today = pd.DataFrame([row for d in today_jsons for row in parse_model23_input(d)])
+#     df_lag1 = pd.DataFrame([row for d in lag1_jsons for row in parse_model23_input(d)])
+#     df_lag7 = pd.DataFrame([row for d in lag7_jsons for row in parse_model23_input(d)])
+
+
+#     if df_today.empty or df_lag1.empty or df_lag7.empty:
+#         return {
+#             "error": "일별 데이터에 의미있는 기본 정보가 보장되지 않았습니다.",
+#             "timestamp": datetime.now().isoformat()
+#         }
+
+#     # (3) 피처 생성
+#     target_date = datetime.now()
+#     X = generate_model2_features(df_today, df_lag1, df_lag7, target_date)
+
+#     # (4) 모델 로드
+#     model_data = load(MODEL_PATH)
+#     cat_model = model_data['cat_model']
+
+#     # (5) 예측
+#     pred = cat_model.predict(X)[0]
+#     # proba = cat_model.predict_proba(X)[0][1]
+#     return round(float(pred), 3)
+
 def recommend(_: dict) -> dict:
-    """
-    ICU 혼잡도 예측 전처 API
+    try:
+        today_jsons = get_realtime_data_for_today()
+        lag1_jsons = get_realtime_data_for_days_ago(1)
+        lag7_jsons = get_realtime_data_for_days_ago(7)
 
-    Returns:
-    - {
-        "prediction": 예측 범위,
-        "probability": 가능성,
-        "timestamp": 시간
-      }
-    """
-    # (1) 데이터 로드
-    today_jsons = get_realtime_data_for_today()
-    lag1_jsons = get_realtime_data_for_days_ago(1)
-    lag7_jsons = get_realtime_data_for_days_ago(7)
+        df_today = pd.DataFrame([row for d in today_jsons for row in parse_model23_input(d)])
+        df_lag1 = pd.DataFrame([row for d in lag1_jsons for row in parse_model23_input(d)])
+        df_lag7 = pd.DataFrame([row for d in lag7_jsons for row in parse_model23_input(d)])
 
-    # (2) 패시 및 DataFrame 변환
-    df_today = pd.DataFrame([row for d in today_jsons for row in parse_model23_input(d)])
-    df_lag1 = pd.DataFrame([row for d in lag1_jsons for row in parse_model23_input(d)])
-    df_lag7 = pd.DataFrame([row for d in lag7_jsons for row in parse_model23_input(d)])
+        if df_today.empty or df_lag1.empty or df_lag7.empty:
+            return {
+                "success": False,
+                "result": {
+                    "message": "일별 데이터에 의미있는 기본 정보가 보장되지 않았습니다.",
+                    "prediction": None
+                }
+            }
 
+        target_date = datetime.now()
+        X = generate_model2_features(df_today, df_lag1, df_lag7, target_date)
 
-    if df_today.empty or df_lag1.empty or df_lag7.empty:
+        model_data = load(MODEL_PATH)
+
+        if isinstance(model_data, dict):
+            cat_model = model_data.get('cat_model')
+        else:
+            cat_model = model_data
+
+        if cat_model is None:
+            return {
+                "success": False,
+                "result": {
+                    "message": "혼잡도 예측 오류: cat_model이 로드되지 않았습니다.",
+                    "prediction": None
+                }
+            }
+
+        pred = cat_model.predict(X)[0]
         return {
-            "error": "일별 데이터에 의미있는 기본 정보가 보장되지 않았습니다.",
-            "timestamp": datetime.now().isoformat()
+            "success": True,
+            "result": {
+                "prediction": round(float(pred), 3)
+            }
         }
-
-    # (3) 피처 생성
-    target_date = datetime.now()
-    X = generate_model2_features(df_today, df_lag1, df_lag7, target_date)
-
-    # (4) 모델 로드
-    model_data = load(MODEL_PATH)
-    cat_model = model_data['cat_model']
-
-    # (5) 예측
-    pred = cat_model.predict(X)[0]
-    proba = cat_model.predict_proba(X)[0][1]
-
-    return {
-        "prediction": int(pred),
-        "probability": float(proba),
-        "timestamp": datetime.now().isoformat()
-    }
+    except Exception as e:
+        return {
+            "success": False,
+            "result": {
+                "message": f"혼잡도 예측 오류: {str(e)}",
+                "prediction": None
+            }
+        }

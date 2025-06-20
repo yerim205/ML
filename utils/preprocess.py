@@ -1,6 +1,4 @@
 # utils/preprocess.py
-import pandas as pd
-from datetime import datetime
 
 # ─── 병동 코드 목록 ─────────────────────────────
 MODEL1_WARD_CODES = {
