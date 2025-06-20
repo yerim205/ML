@@ -46,6 +46,8 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.NCR_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}, ${{ secrets.NCR_REGISTRY }}/${{ env.APP_NAME }}:latest
+          build-args: |
+            P_CURRENT_ACTIVE=${{ env.ACTIVE }}
 
   Continuous-Deployment:
     # if: github.event.pull_request.merged == true
