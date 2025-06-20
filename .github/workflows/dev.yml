@@ -4,7 +4,7 @@ on:
   # pull_request:
     # types: [ closed ]
   push:
-    branches: [ dev, stg ]
+    branches: [ dev ]
 
 env:
   ACTIVE: ${{ github.ref_name }}
@@ -13,6 +13,7 @@ env:
   PROJECT_NAME: rmrp-ai
   IMAGE_TAG: ${{ github.sha }}
   APP_NAME: rmrp-ai-${{ github.ref_name }}
+  PORT: 8000
 
 jobs:
   Continuous-Integration:
@@ -47,7 +48,7 @@ jobs:
           push: true
           tags: ${{ secrets.NCR_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}, ${{ secrets.NCR_REGISTRY }}/${{ env.APP_NAME }}:latest
           build-args: |
-            P_CURRENT_ACTIVE=${{ env.ACTIVE }}
+            P_CURRENT_PORT=${{ env.PORT }}
 
   Continuous-Deployment:
     # if: github.event.pull_request.merged == true
