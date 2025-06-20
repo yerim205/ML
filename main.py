@@ -26,10 +26,8 @@ class RecommendResponse(BaseModel):
     result: Any
     
 @app.get("/health-check")
-def recommend_transfer():
+async def healthCheck():
     return "ok"
-
-    
 
 # ─── ValidationError 핸들러: success=false 로 반환 ───────
 @app.exception_handler(RequestValidationError)
