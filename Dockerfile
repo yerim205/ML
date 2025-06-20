@@ -1,20 +1,20 @@
 FROM python:3.12.8
 
 ARG P_CURRENT_ACTIVE
-ARG P_CURRENT_PORT
+# ARG P_CURRENT_PORT
 
-# RUN if [ "$P_CURRENT_ACTIVE" = "dev" ]; then \
-#       echo "FASTAPI_ROOT_PATH=/edaapi-$P_CURRENT_ACTIVE" >> /etc/environment; \
-#     elif [ "$P_CURRENT_ACTIVE" = "stg" ]; then \
-#       echo "FASTAPI_ROOT_PATH=/edaapi" >> /etc/environment; \
-#     else \
-#       echo "FASTAPI_ROOT_PATH=/edaapi" >> /etc/environment; \
-#     fi
+RUN if [ "$P_CURRENT_ACTIVE" = "dev" ]; then \
+      ENV PORT=8000 \
+    elif [ "$P_CURRENT_ACTIVE" = "stg" ]; then \
+      ENV PORT=8000 \
+    else \
+      ENV PORT=8000 \
+    fi
 
 # ENV FASTAPI_ROOT_PATH="/edaapi-"${P_CURRENT_ACTIVE}
 
 # ENV PORT=${P_CURRENT_PORT}
-ENV PORT=8000
+# ENV PORT=8000
 
 WORKDIR /code
 
