@@ -79,6 +79,49 @@ async def recommend_transfer(req: ICDRequest):
             }
         )
 
+from fastapi import Query
+
+# @app.get("/transfer/recommend", response_model=RecommendResponse)
+# async def recommend_transfer(icd: str = Query(..., description="ICD 코드")):
+#     try:
+#         icd_code = icd.strip().upper()
+#         result = auto_transfer_recommend(icd_code)
+#         ward_list = [w["ward"] for w in result.get("recommended_wards", [])]
+
+#         if not ward_list:
+#             return JSONResponse(
+#                 status_code=200,
+#                 content={
+#                     "success": False,
+#                     "result": {
+#                         "message": "추천 가능한 병동이 없습니다.",
+#                         "ward": []
+#                     }
+#                 }
+#             )
+
+#         return JSONResponse(
+#             status_code=200,
+#             content={
+#                 "success": True,
+#                 "result": {
+#                     "ward": ward_list
+#                 }
+#             }
+#         )
+
+#     except Exception as e:
+#         return JSONResponse(
+#             status_code=500,
+#             content={
+#                 "success": False,
+#                 "result": {
+#                     "message": f"전실 추천 오류: {e}",
+#                     "ward": []
+#                 }
+#             }
+#         )
+
 # ─── model2: ICU 혼잡도 (POST) ────────────────
 @app.post("/congestion/recommend")
 async def recommend_congestion():
