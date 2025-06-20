@@ -107,8 +107,11 @@ def auto_recommend() -> dict:
             if missing_cols:
                 raise ValueError(f"수치형 컬럼 누락: {missing_cols}")
 
-            X[num_cols] = imputer.transform(X[num_cols])
-            X[num_cols] = scaler.transform(X[num_cols])
+            X_vals = scaler.transform(imputer.transform(X[num_cols].values))
+            X[num_cols] = X_vals
+
+            # X[num_cols] = imputer.transform(X[num_cols])
+            # X[num_cols] = scaler.transform(X[num_cols])
             X[cat_col_filtered] = X[cat_col_filtered].astype(str)
 
             pool = Pool(X, cat_features=cat_col_filtered)

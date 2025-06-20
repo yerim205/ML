@@ -1,13 +1,3 @@
-# # ─── model1: top3_transfer ────────────────────────
-# @app.get("/transfer/recommend", response_model=RecommendResponse)
-# def auto_transfer_recommend():
-#     try:
-#         from recommend.top3_transfer_recommend import auto_transfer_recommend
-#         result = auto_transfer_recommend()
-#         return RecommendResponse(result=result)
-#     except Exception as e:
-#         raise HTTPException(500, detail=str(e))
-
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Any
@@ -16,8 +6,8 @@ from fastapi.exceptions import RequestValidationError
 from typing import Optional
 
 from recommend.top3_transfer_recommend import auto_transfer_recommend
-from recommend.icu_congestion_recommend import recommend as congestion_recommend
-from recommend.icu_discharge_recommend import auto_recommend as discharge_recommend
+from recommend.icu_congestion_recommend import auto_congestion_recommend
+from recommend.icu_discharge_recommend import auto_recommend
 
 app = FastAPI()
 
@@ -48,37 +38,38 @@ class ICDRequest(BaseModel):
     icd: str
     
 # ─── model1: 전실 추천 (POST + JSON) ─────────────
-@app.post("/transfer/recommend")
+@app.post("/transfer/recommend", response_model=RecommendResponse)
 async def recommend_transfer(req: ICDRequest):
     try:
         icd_code = req.icd.strip().upper()
+        result = auto_transfer_recommend(icd_code)
+        ward_list = [w["ward"] for w in result.get("recommended_wards", [])]
 
-        if not icd_code:
+        if not ward_list:
             return JSONResponse(
                 status_code=200,
                 content={
                     "success": False,
                     "result": {
-                        "message": "ICD 코드가 비어 있습니다.",
+                        "message": "추천 가능한 병동이 없습니다.",
                         "ward": []
                     }
                 }
             )
 
-        result = auto_transfer_recommend(icd_code)
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
                 "result": {
-                    "ward": [w["ward"] for w in result.get("recommended_wards", [])]
+                    "ward": ward_list
                 }
             }
         )
 
     except Exception as e:
         return JSONResponse(
-            status_code=200,
+            status_code=500,
             content={
                 "success": False,
                 "result": {
@@ -87,61 +78,70 @@ async def recommend_transfer(req: ICDRequest):
                 }
             }
         )
-    
+
 # ─── model2: ICU 혼잡도 (POST) ────────────────
 @app.post("/congestion/recommend")
 async def recommend_congestion():
     try:
-        result = congestion_recommend({})
+        res = auto_congestion_recommend({})
+
+        # 실패한 경우 그대로 반환
+        if not res.get("success", False):
+            return JSONResponse(status_code=200, content=res)
+
+        # 성공한 경우: prediction이 없으면 에러로 처리
+        result = res.get("result", {})
+        if "prediction" not in result:
+            raise ValueError("예측 결과 'prediction'이 없습니다.")
+
+        prediction = int(result["prediction"])
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
                 "result": {
-                    "prediction": int(result["prediction"])
+                    "prediction": prediction
                 }
             }
         )
+
     except Exception as e:
         return JSONResponse(
-            status_code=200,
+            status_code=500,
             content={
                 "success": False,
                 "result": {
-                    "message": f"혼잡도 예측 오류: {e}",
+                    "message": f"혼잡도 예측 오류: {str(e)}",
                     "prediction": None
                 }
             }
         )
-
-
 # ─── model3: ICU 퇴실 추천 (POST) ────────────────
 @app.post("/discharge/recommend")
 async def recommend_discharge():
     try:
-        result = discharge_recommend()
+        prediction = auto_recommend()
+
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
                 "result": {
-                    "prediction": result 
+                    "prediction": prediction
                 }
             }
         )
     except Exception as e:
         return JSONResponse(
-            status_code=200,
+            status_code=500,
             content={
                 "success": False,
                 "result": {
-                    "message": f"퇴실 추천 오류: {e}",
+                    "message": f"퇴원 예측 오류: {str(e)}",
                     "prediction": None
                 }
             }
         )
-
-    
 # ─── 루트 엔드포인트 ────────────────────────
 @app.get("/")
 def root():

@@ -1,5 +1,5 @@
 # # retrain/top3_transfer_retrain.py
-# # 필히 수정 요함
+# 수정 요함
 # import os
 # import sys
 # import shutil

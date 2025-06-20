@@ -55,30 +55,28 @@ def auto_transfer_recommend(icd_code: str) -> dict:
         # 3. 모델 기반 추천 시도
 
         ranked = model.recommend(icd=icd_code, df_live=df_live, top_k=3)
-
-
+        print("모델 추천 결과:", ranked)
         print(" >> 추천 후보군 (점수 있는 ward 수):", len(ranked))
         print(" >> 추천 점수 목록:", ranked)
+
         if ranked:
-            print("모델 기반 추천 완료")
-            return {
-                "recommended_wards": [{"ward": w, "score": round(s, 5)} for w, s in ranked],
-                "icd": icd_code
+         return {
+            "recommended_wards": [{"ward": w, "score": round(s, 5)} for w, s in ranked],
+            "icd": icd_code
             }
 
-        # 4. 모델 추천이 비었을 경우  fallback
-        print("모델 추천 결과 없음 >> fallback 실행")
+# fallback
         fallback_df = df_live.sort_values("occupancy").head(3)
         fallback_result = [
-            {"ward": row["ward"], "score": 0.0}
-            for _, row in fallback_df.iterrows()
+             {"ward": row["ward"], "score": 0.0}
+             for _, row in fallback_df.iterrows()
         ]
 
         return {
-            "recommended_wards": fallback_result,
-            "icd": icd_code,
-            "fallback": True
-        }
+               "recommended_wards": fallback_result,
+                "icd": icd_code,
+                "fallback": True
+          }
 
     except Exception as e:
-        raise ValueError(f"자동 전실 추천 오류: {e}")
+         raise ValueError(f"자동 전실 추천 오류: {e}")
