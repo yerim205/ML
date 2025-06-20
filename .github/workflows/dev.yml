@@ -1,0 +1,92 @@
+name: Deploy to Naver Cloud Platform
+
+on:
+  # pull_request:
+    # types: [ closed ]
+  push:
+    branches: [ dev, stg ]
+
+env:
+  ACTIVE: ${{ github.ref_name }}
+  ORGAN: aitstory
+  INFRA_REPO: rmrp-env
+  PROJECT_NAME: rmrp-ai
+  IMAGE_TAG: ${{ github.sha }}
+  APP_NAME: rmrp-ai-${{ github.ref_name }}
+
+jobs:
+  Continuous-Integration:
+    # if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build auth setting
+        run: chmod +x gradlew
+
+      - name: Build
+        run: ./gradlew clean build -x test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to NCR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.NCR_REGISTRY }}
+          username: ${{ secrets.NCP_ACCESS_KEY }}
+          password: ${{ secrets.NCP_SECRET_KEY }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.NCR_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}, ${{ secrets.NCR_REGISTRY }}/${{ env.APP_NAME }}:latest
+
+  Continuous-Deployment:
+    # if: github.event.pull_request.merged == true
+    needs: Continuous-Integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout env repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.ORGAN }}/${{ env.INFRA_REPO }}
+          token: ${{ secrets.ADM_GITHUB_SECRET }}
+          path: ${{ env.INFRA_REPO }}
+      
+      - name: Prepare deployment files
+        run: |
+          cd ${{ env.INFRA_REPO }}/${{ env.PROJECT_NAME }}/${{ env.ACTIVE }}
+          echo "Image Tag Update"
+          sed -i "s|image:.*${{ env.APP_NAME }}:.*|image: ${{ secrets.NCR_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}|g" deployment.yaml
+
+      - name: Setting Ncp Iam Authenticator for NKS
+        run: |
+          curl -o ncp-iam-authenticator -L https://github.com/NaverCloudPlatform/ncp-iam-authenticator/releases/latest/download/ncp-iam-authenticator_linux_amd64
+          chmod +x ./ncp-iam-authenticator
+          # ncp-iam-authenticator 사용을 위한 시스템 전역 경로로 이동
+          sudo mv ./ncp-iam-authenticator /usr/local/bin/
+          ncp-iam-authenticator help
+
+      - name: Setting Ncloud Configure for NKS
+        run: |
+          mkdir -p ~/.ncloud
+          echo "[DEFAULT]" > ~/.ncloud/configure
+          echo "ncloud_access_key_id = ${{ secrets.NCP_ACCESS_KEY }}" >> ~/.ncloud/configure
+          echo "ncloud_secret_access_key = ${{ secrets.NCP_SECRET_KEY }}" >> ~/.ncloud/configure
+          echo "ncloud_api_url = https://ncloud.apigw.ntruss.com" >> ~/.ncloud/configure
+
+      - name: Setting for Naver Kubernetes Service
+        run: |
+          ncp-iam-authenticator update-kubeconfig --region KR --clusterUuid ${{ secrets.NCP_KUBE_CLUSTER_UUID }}
+          
+      - name: Service Deployment
+        run: |
+          echo "Yaml Dir : ${{ env.INFRA_REPO }}/${{ env.PROJECT_NAME }}/${{ env.ACTIVE }}"
+          kubectl apply -f ${{ env.INFRA_REPO }}/${{ env.PROJECT_NAME }}/${{ env.ACTIVE }}/.
+          
+      - name: Verify Deployment
+        run: |
+          kubectl rollout status deployment ${{ env.APP_NAME }}
