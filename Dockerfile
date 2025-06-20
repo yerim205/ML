@@ -27,7 +27,7 @@ COPY . .
 # CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", ${ACTIVE}]
 # CMD uvicorn main:app --host 0.0.0.0 --port $PORT
 #CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
-RUN echo '#!/bin/bash\nsource /etc/environment\nexport $(cat /etc/environment | xargs)\nuvicorn src.main.main:app --host 0.0.0.0 --port $PORT' > /code/start.sh
+RUN echo '#!/bin/bash\nsource /etc/environment\nexport $(cat /etc/environment | xargs)\nuvicorn main:app --host 0.0.0.0 --port $PORT' > /code/start.sh
 RUN chmod +x /code/start.sh
 
 CMD ["/code/start.sh"]
