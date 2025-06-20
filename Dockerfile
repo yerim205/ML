@@ -4,11 +4,11 @@ ARG P_CURRENT_ACTIVE
 # ARG P_CURRENT_PORT
 
 RUN if [ "$P_CURRENT_ACTIVE" = "dev" ]; then \
-      ENV PORT=8000 \
+      export PORT=8000 \
     elif [ "$P_CURRENT_ACTIVE" = "stg" ]; then \
-      ENV PORT=8000 \
+      export PORT=8000 \
     else \
-      ENV PORT=8000 \
+      export PORT=8000 \
     fi
 
 # ENV FASTAPI_ROOT_PATH="/edaapi-"${P_CURRENT_ACTIVE}
