@@ -22,46 +22,7 @@
 
 ```json
 {
-  "data": {
-    "dissInfo": [
-      { "dissCd": "I60" }
-    ],
-    "ptrmInfo": [
-      {
-        "ptntDtlsCtrlAllLst": [
-          {
-            "wardLst": [
-              {
-                "wardCd": "71병동",
-                "embdCct": 2,
-                "dschCct": 3,
-                "useSckbCnt": 25,
-                "admsApntCct": 1,
-                "chupCct": 1
-              },
-              {
-                "wardCd": "외과ICU",
-                "embdCct": 1,
-                "dschCct": 2,
-                "useSckbCnt": 27,
-                "admsApntCct": 0,
-                "chupCct": 0
-              },
-              {
-                "wardCd": "72병동",
-                "embdCct": 2,
-                "dschCct": 2,
-                "useSckbCnt": 40,
-                "admsApntCct": 1,
-                "chupCct": 1
-              }
-            ]
-          }
-        ]
-      }
-    ],
-    "topK": 3
-  }
+  "icd": "I63"
 }
 ```
 
@@ -87,19 +48,7 @@
 * **예시 요청 JSON:**
 
 ```json
-{
-  "data": {
-    "free_beds": 3,
-    "occ_rate": 0.87,
-    "occupancy_change": 1,
-    "occ_rate_lag1": 0.85,
-    "occ_rate_lag7": 0.83,
-    "is_weekend": 0,
-    "is_public_holiday": 1, #제거 함
-    "month": 6, # 제거함 
-    "quarter": 2 # 제거함
-  }
-}
+
 ```
 * **예시 응답:**
 
@@ -121,24 +70,7 @@
 * **예시 요청 JSON:**
 
 ```json
-{
-  "data": {
-    "admissions": 20,
-    "occupancy_rate": 0.85,
-    "prev_dis": 18,
-    "prev_week_dis": 15,
-    "morning_ratio": 0.6,
-    "afternoon_ratio": 0.4,
-    "avg_age": 67.5, # 제거함
-    "male_ratio": 0.55, # 제거함
-    "female_ratio": 0.45, # 제거함 
-    "dow": 0, #요일을 숫자로 범주화 한 것
-    "is_weekend": 0,
-    "is_public_holiday": 0, #제거함
-    "mon": 6, # 제거 함
-    "ward_code": "ICU1"
-  }
-}
+
 ```
 
 * **예시 응답:**
