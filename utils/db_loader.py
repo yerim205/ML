@@ -1,15 +1,26 @@
 #utils/db_loader.py >> 병상 API
 import os, json
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, URL
 from datetime import datetime, timedelta
 from datetime import date, timedelta, time
 from sqlalchemy import cast, DateTime
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(DATABASE_URL, future=True)
+DB_URL  = os.getenv("DB_URL")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PW   = os.getenv("DB_PW")
+
+URL_OBJ = URL.create(
+    drivername="mysql+pymysql",
+    username=DB_USER,
+    password=DB_PW,
+    host=DB_URL,
+    port=DB_PORT,
+)
+engine  = create_engine(URL_OBJ, future=True)
 
 def get_latest_realtime_data() -> dict:
     query = text("""
