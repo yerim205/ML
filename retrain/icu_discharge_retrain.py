@@ -9,16 +9,28 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, URL
 from dotenv import load_dotenv
 
 # ─── 환경 설정 ─────────────────
 ROOT = Path(__file__).parent.parent
 load_dotenv(dotenv_path=ROOT / ".env")
 
-DATABASE_URL      = os.getenv("DATABASE_URL")
 ARCHIVE_MODEL_DIR = Path(os.getenv("ARCHIVE_MODEL_DIR", "./data/archive/models"))
-engine            = create_engine(DATABASE_URL, future=True)
+
+DB_URL  = os.getenv("DB_URL")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PW   = os.getenv("DB_PW")
+
+URL_OBJ = URL.create(
+    drivername="mysql+pymysql",
+    username=DB_USER,
+    password=DB_PW,
+    host=DB_URL,
+    port=DB_PORT,
+)
+engine  = create_engine(URL_OBJ, future=True)
 
 # ─── 컬럼 매핑 & 전처리 유틸 ────
 from utils.column_mapping import COLUMN_MAPPING
