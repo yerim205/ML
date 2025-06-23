@@ -109,6 +109,8 @@ def parse_model23_input(realtime_data: dict) -> list[dict]:
 
                     if ward_cd in MODEL23_WARD_CODES:
                         parsed = parse_bed_status_counts(ward)
+                        parsed["ward_code"] = ward_cd #6월 23일 추가
+
                         #print(" 병상 파싱 성공:", parsed)
                         results.append(parsed)
     except Exception as e:
