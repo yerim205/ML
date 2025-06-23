@@ -28,8 +28,7 @@ async def lifespan(app: FastAPI):
         logger.info("스케줄러가 백그라운드에서 실행되었습니다.")
     except Exception as e:
         logger.error(f"스케줄러 실행 실패: {e}")
-
-#     yield  # 서버가 실행됨
+    yield  # 서버가 실행됨
 #     logger.info("FastAPI 서버 종료")
 
 
@@ -37,7 +36,7 @@ app = FastAPI(lifespan=lifespan)
 # app = FastAPI()
 
 @app.get("/health-check")
-def healthCheck():
+async def healthCheck():
     return "ok"
 
 # ─── 공통 응답 스키마 ──────────────────────
