@@ -5,7 +5,10 @@ from datetime import datetime
 import pandas as pd
 import traceback
 from catboost import Pool
-import numpy as np  # 파일 상단에 추가
+import numpy as np  
+import joblib
+
+from utils.ncp_client import download_file_from_ncp
 
 
 from utils.db_loader import (
@@ -17,19 +20,27 @@ from utils.preprocess import (
     generate_model2_features
 )
 
+# ROOT = Path(__file__).parent.parent
+# MODEL_PATH = ROOT / "model" / "model2.pkl"
+
 ROOT = Path(__file__).parent.parent
-MODEL_PATH = ROOT / "model" / "model2.pkl"
+LOCAL_MODEL_PATH = ROOT / "model" / "model2.pkl"
+NCP_MODEL_KEY = "rmrp-models/model2.pkl" 
 
 def auto_congestion_recommend(_: dict) -> dict:
     try:
         # ─── (1) 모델 로딩 ─────────────────────
-        model_data = load(MODEL_PATH)
+        if not LOCAL_MODEL_PATH.exists():
+            print("모델이 로컬에 없음 → NCP에서 다운로드 중")
+            download_file_from_ncp(NCP_MODEL_KEY, str(LOCAL_MODEL_PATH))
+
+        model_data = load(LOCAL_MODEL_PATH)
 
         model_list = model_data.get("models")
         if not model_list or not isinstance(model_list, list):
             raise ValueError("'models' 키에 유효한 모델 리스트가 없습니다.")
 
-        model = model_list[0]  # 첫 번째 모델 사용
+        model = model_list[0]
 
         # ─── (2) 데이터 수집 ─────────────────────
         today_jsons = get_realtime_data_for_today()
