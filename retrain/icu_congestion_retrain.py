@@ -1,36 +1,77 @@
 # retrain/icu_congestion_retrain.py
-import sys
-from pathlib import Path
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
 import os
+import sys
+import json
 import joblib
 import shutil
-import logging, json
+import logging
+import pandas as pd
+
 from pathlib import Path
 from datetime import datetime, timezone
-
-import pandas as pd
-from dotenv import load_dotenv
 from catboost import CatBoostClassifier
+from dotenv import load_dotenv
 
-from utils.db_loader import get_api_logs_raw  # 새로 추가한 함수
-from utils.preprocess import (
-    parse_model23_input,
-    preprocess
-)
-
-# ─── 환경 설정 ─────────────────────────────
-ROOT = Path(__file__).parent.parent
+# ─── 경로 및 환경설정 ─────────────────────────────
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 load_dotenv(dotenv_path=ROOT / ".env")
 
-ARCHIVE_MODEL_DIR = Path(os.getenv("ARCHIVE_MODEL_DIR", "./data/archive/models"))
-MODEL_PATH = ROOT / "model" / "model2.pkl"
-MODEL_PATH.parent.mkdir(exist_ok=True, parents=True)
+# 추가 드론 기능 가져오기
+from utils.db_loader import get_api_logs_raw
+from utils.preprocess import parse_model23_input, preprocess
+from utils.ncp_client import upload_file_to_ncp
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+MODEL_SAVE_PATH = ROOT / "model" / "model2.pkl"
+ARCHIVE_MODEL_DIR = Path(os.getenv("ARCHIVE_MODEL_DIR", "./data/archive/models"))
+NCP_MODEL_KEY = "rmrp-models/model2.pkl"
+
+# 포맷 설정
+MODEL_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+ARCHIVE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+logger = logging.getLogger("ICU_RETRAIN")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# ─── 병상 데이터 로딩 및 파싱 ─────────────────────────
+def load_parsed_records(days: int = 1) -> pd.DataFrame:
+    raw_df = get_api_logs_raw(days)
+    if raw_df.empty:
+        logger.warning("[ICU] 병상 API 로그가 비어 있습니다.")
+        return pd.DataFrame()
+
+    records = []
+    for ct, reg_dtm in zip(raw_df["ctnt"], raw_df["reg_dtm"]):
+        try:
+            j = json.loads(ct)
+            j["_timestamp"] = reg_dtm.replace(tzinfo=timezone.utc)
+            records.extend(parse_model23_input(j))
+        except Exception as e:
+            logger.warning(f"[ICU] JSON 파싱 실패 → {e}")
+            continue
+
+    return pd.DataFrame(records)
+
+
+# ─── 모델 저장 및 NCP 업로드 ─────────────────────────
+def save_model_and_upload(model_dict: dict):
+    # 1. 로컬 저장
+    joblib.dump(model_dict, MODEL_SAVE_PATH)
+
+    # 2. 버전 아카이브 저장
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    archive_path = ARCHIVE_MODEL_DIR / f"icu_congestion_{ts}.pkl"
+    shutil.copy(MODEL_SAVE_PATH, archive_path)
+    logger.info(f"[저장] 로컬 모델 → {MODEL_SAVE_PATH}")
+    logger.info(f"[저장] 아카이브 → {archive_path}")
+
+    # 3. NCP 업로드
+    try:
+        upload_file_to_ncp(str(MODEL_SAVE_PATH), NCP_MODEL_KEY)
+        logger.info(f"[NCP] 업로드 완료 → {NCP_MODEL_KEY}")
+    except Exception as e:
+        logger.error(f"[NCP] 업로드 실패 → {e}")
+
+
 
 # ─── 메인 재학습 함수 ───────────────────────
 def model2_retrain():
@@ -48,7 +89,7 @@ def model2_retrain():
             j["_timestamp"] = reg_dtm.replace(tzinfo=timezone.utc)
             records.extend(parse_model23_input(j))
         except Exception as e:
-            logger.warning(f"⚠️ JSON 파싱 실패: {e}")
+            logger.warning(f"JSON 파싱 실패: {e}")
             continue
 
     df = pd.DataFrame(records)
@@ -90,16 +131,8 @@ def model2_retrain():
     )
     model.fit(X, y)
 
-    # ── 5. 저장 및 아카이브 ─────────────────────
-    joblib.dump({"models": [model]}, MODEL_PATH)
-
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    archive_path = ARCHIVE_MODEL_DIR / f"icu_congestion_{ts}.pkl"
-    archive_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(MODEL_PATH, archive_path)
-
-    logger.info(f"재학습 완료: {MODEL_PATH}")
-    logger.info(f"아카이브 저장 완료: {archive_path}")
+    # ── 모델 저장 및 업로드 ─────────────────────────────
+    save_model_and_upload({"models": [model]})
 
 # ─── 스크립트 실행 시 ───────────────────────
 if __name__ == "__main__":
