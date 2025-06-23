@@ -173,7 +173,6 @@ def get_realtime_data_for_date(target_date: date) -> list[dict]:
            AND DATE(reg_dtm) = :target_date
          ORDER BY reg_dtm DESC
     """)
-
     results = []
 
     with engine.connect() as conn:
@@ -223,6 +222,7 @@ def get_api_logs_raw(days: int) -> pd.DataFrame:
         SELECT ctnt, reg_dtm
           FROM rmrp_portal.tb_api_log
          WHERE req_res = 'REQ'
+           AND com_src_cd = 'CMC03'
            AND reg_dtm >= NOW() - INTERVAL :d DAY
            AND com_src_cd = 'CMC03'
     """)
