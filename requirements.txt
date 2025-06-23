@@ -21,6 +21,7 @@ boto3>=1.38.35
 
 # Serialization & utilities
 joblib>=1.1.0
+cryptography==45.0.4
 
 # Model-specific notes:
 # icu_congestion & icu_discharge: use catboost, optuna, imbalanced-learn
