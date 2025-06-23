@@ -19,22 +19,22 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=ROOT / ".env")
 
 # URL 한 줄로 로딩
-DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(DATABASE_URL, future=True)
+# DATABASE_URL = os.getenv("DATABASE_URL")
+# engine = create_engine(DATABASE_URL, future=True)
 
-# DB_URL  = os.getenv("DB_URL")
-# DB_PORT = os.getenv("DB_PORT")
-# DB_USER = os.getenv("DB_USER")
-# DB_PW   = os.getenv("DB_PW")
+DB_URL  = os.getenv("DB_URL")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PW   = os.getenv("DB_PW")
 
-# URL_OBJ = URL.create(
-#     drivername="mysql+pymysql",
-#     username=DB_USER,
-#     password=DB_PW,
-#     host=DB_URL,
-#     port=DB_PORT,
-# )
-# engine  = create_engine(URL_OBJ, future=True)
+URL_OBJ = URL.create(
+    drivername="mysql+pymysql",
+    username=DB_USER,
+    password=DB_PW,
+    host=DB_URL,
+    port=DB_PORT,
+)
+engine  = create_engine(URL_OBJ, future=True)
 
 def get_latest_realtime_data() -> dict:
     query = text("""
