@@ -47,7 +47,7 @@ def model3_retrain():
             j["_timestamp"] = reg_dtm.replace(tzinfo=timezone.utc)
             records.extend(parse_model23_input(j))
         except Exception as e:
-            logger.warning(f"⚠️ JSON 파싱 실패: {e}")
+            logger.warning(f"JSON 파싱 실패: {e}")
             continue
 
     df = pd.DataFrame(records)
