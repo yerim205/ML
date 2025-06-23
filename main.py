@@ -14,6 +14,9 @@ from recommend.top3_transfer_recommend import auto_transfer_recommend
 from recommend.icu_congestion_recommend import auto_congestion_recommend
 from recommend.icu_discharge_recommend import auto_recommend
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # ─── 로깅 설정 ──────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

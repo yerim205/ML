@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=ROOT / ".env")
 
 # URL 한 줄로 로딩
-# DATABASE_URL = os.getenv("DATABASE_URL")
-# engine = create_engine(DATABASE_URL, future=True)
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL, future=True)
 
 DB_URL  = os.getenv("DB_URL")
 DB_PORT = os.getenv("DB_PORT")

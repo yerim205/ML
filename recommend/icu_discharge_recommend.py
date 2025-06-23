@@ -10,23 +10,38 @@ from joblib import load
 from datetime import datetime
 from catboost import Pool
 import pandas as pd
+import logging
 
+import os
+from dotenv import load_dotenv
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+#-------npc 
 from utils.ncp_client import download_file_from_ncp
 
-# ─── 모델 경로 상수 ─────────────────────────
-# ROOT = Path(__file__).parent.parent
-# MODEL_PATH = ROOT / "model" / "model3.pkl"
+
+# ─── 환경 설정 ─────────────────
 ROOT = Path(__file__).parent.parent
-LOCAL_MODEL_PATH = ROOT / "model" / "model3.pkl"
-NCP_MODEL_KEY = "rmrp-models/model3.pkl"  
+load_dotenv(dotenv_path=ROOT / ".env")
+
+LOCAL_MODEL3_PATH = Path(os.getenv("LOCAL_MODEL3_PATH", ROOT / "model" / "model3.pkl"))
+NCP_MODEL3_KEY = os.getenv("NCP_MODEL3_KEY", "rmrp-models/model3.pkl")
+
+LOCAL_MODEL3_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 
 # ─── 모델 로딩 ──────────────────────────────
 def load_discharge_model():
-    if not LOCAL_MODEL_PATH.exists():
+    if not LOCAL_MODEL3_PATH.exists():
         print("로컬에 model3 없음 → NCP에서 다운로드 중...")
-        download_file_from_ncp(NCP_MODEL_KEY, str(LOCAL_MODEL_PATH))
+        download_file_from_ncp(NCP_MODEL3_KEY, str(LOCAL_MODEL3_PATH))
 
-    model_data = load(LOCAL_MODEL_PATH)
+    model_data = load(LOCAL_MODEL3_PATH)
     return (
         model_data["cat_model"],
         model_data["scaler"],
@@ -130,6 +145,9 @@ def auto_recommend() -> dict:
             total_pred += pred
 
         avg_pred = total_pred / len(results) if results else None
+    except ValueError:
+        logger.warning("어제 데이터 없음 → 2일 전 데이터로 대체")
+        lag1_raw = get_latest_realtime_data_for_days_ago(2, base_ts)
 
         return round(avg_pred,3)
     

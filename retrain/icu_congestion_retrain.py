@@ -17,18 +17,21 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 load_dotenv(dotenv_path=ROOT / ".env")
 
-# 추가 드론 기능 가져오기
 from utils.db_loader import get_api_logs_raw
 from utils.preprocess import parse_model23_input, preprocess
 from utils.ncp_client import upload_file_to_ncp
 
-MODEL_SAVE_PATH = ROOT / "model" / "model2.pkl"
-ARCHIVE_MODEL_DIR = Path(os.getenv("ARCHIVE_MODEL_DIR", "./data/archive/models"))
-NCP_MODEL_KEY = "rmrp-models/model2.pkl"
 
-# 포맷 설정
-MODEL_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+# ─── 경로 설정 ───────────────────────────────
+LOCAL_MODEL_PATH = Path(os.getenv("LOCAL_MODEL2_PATH", "./model/model2.pkl"))
+NCP_MODEL_KEY = os.getenv("NCP_MODEL2_KEY", "rmrp-models/model2.pkl")
+NCP_MODEL_ARCHIVE_DIR = os.getenv("NCP_MODEL2_ARCHIVE_DIR", "archive/model2/")
+ARCHIVE_MODEL_DIR = Path(os.getenv("ARCHIVE_MODEL_DIR", "./data/archive/models"))
+
+# ─── 경로 생성 ───────────────────────────────
+LOCAL_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
 ARCHIVE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
 logger = logging.getLogger("ICU_RETRAIN")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -51,27 +54,26 @@ def load_parsed_records(days: int = 1) -> pd.DataFrame:
 
     return pd.DataFrame(records)
 
-
 # ─── 모델 저장 및 NCP 업로드 ─────────────────────────
 def save_model_and_upload(model_dict: dict):
     # 1. 로컬 저장
-    joblib.dump(model_dict, MODEL_SAVE_PATH)
+    joblib.dump(model_dict, LOCAL_MODEL_PATH)
 
     # 2. 버전 아카이브 저장
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    archive_path = ARCHIVE_MODEL_DIR / f"icu_congestion_{ts}.pkl"
-    shutil.copy(MODEL_SAVE_PATH, archive_path)
-    logger.info(f"[저장] 로컬 모델 → {MODEL_SAVE_PATH}")
+    archive_name = f"icu_congestion_{ts}.pkl"
+    archive_path = ARCHIVE_MODEL_DIR / archive_name
+    shutil.copy(LOCAL_MODEL_PATH, archive_path)
+    logger.info(f"[저장] 로컬 모델 → {LOCAL_MODEL_PATH}")
     logger.info(f"[저장] 아카이브 → {archive_path}")
 
     # 3. NCP 업로드
     try:
-        upload_file_to_ncp(str(MODEL_SAVE_PATH), NCP_MODEL_KEY)
-        logger.info(f"[NCP] 업로드 완료 → {NCP_MODEL_KEY}")
+        upload_file_to_ncp(str(LOCAL_MODEL_PATH), NCP_MODEL_KEY)
+        upload_file_to_ncp(str(LOCAL_MODEL_PATH), f"{NCP_MODEL_ARCHIVE_DIR}{archive_name}")
+        logger.info(f"[NCP] 업로드 완료 → {NCP_MODEL_ARCHIVE_DIR}{archive_name}")
     except Exception as e:
         logger.error(f"[NCP] 업로드 실패 → {e}")
-
-
 
 # ─── 메인 재학습 함수 ───────────────────────
 def model2_retrain():
@@ -101,13 +103,13 @@ def model2_retrain():
     hist7 = (
         df.assign(total=lambda x: x.embdCct + x.dschCct + x.useSckbCnt + x.admsApntCct + x.chupCct)
           .eval("occ_rate = embdCct / total")
-          .groupby("wardCd")["occ_rate"]
+          .groupby("ward_code")["occ_rate"]
           .mean()
           .rename("occ_rate_7d_ago")
           .reset_index()
     )
-    df = df.merge(hist7, on="wardCd", how="left")
-
+    df = df.merge(hist7, on="ward_code", how="left")
+    
     # ── 2. 피처 및 타깃 생성 ───────────────────
     df["total_beds"] = df[["embdCct", "dschCct", "useSckbCnt", "admsApntCct", "chupCct"]].sum(axis=1)
     df["occupied_beds"] = df["useSckbCnt"]
@@ -117,6 +119,9 @@ def model2_retrain():
 
     # ── 3. 전처리 ───────────────────────────────
     X = preprocess(df)
+    if X is None or X.empty:
+        logger.error("[preprocess] 반환된 X가 None 또는 비어있습니다. 재학습 중단")
+        return
     cat_idx = [X.columns.get_loc("ward_code")]
 
     # ── 4. 모델 학습 ────────────────────────────

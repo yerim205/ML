@@ -9,6 +9,11 @@ from utils.db_loader import get_latest_realtime_data
 from recommend.hybrid_scheduler import EDGES_BY_ICD, RAW_PRIORITY_WEIGHTS
 from utils.ncp_client import download_file_from_ncp 
 
+import os
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")  # 루트의 .env 명시적으로 로드
+
+
 CODE_TO_ICD = {
     "01": "I21",
     "02": "I63",
