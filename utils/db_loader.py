@@ -223,8 +223,8 @@ def get_api_logs_raw(days: int) -> pd.DataFrame:
           FROM rmrp_portal.tb_api_log
          WHERE req_res = 'REQ'
            AND com_src_cd = 'CMC03'
+           AND req_url LIKE '%mdcl-rm-rcpt%'
            AND reg_dtm >= NOW() - INTERVAL :d DAY
-           AND com_src_cd = 'CMC03'
     """)
     with engine.connect() as conn:
         return pd.read_sql(query, conn, params={"d": days})
