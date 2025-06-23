@@ -18,28 +18,27 @@ from recommend.icu_discharge_recommend import auto_recommend
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     try:
-#         scheduler_path = os.path.join(os.path.dirname(__file__), "api", "scheduler.py")
-#         env = os.environ.copy()
-#         env["PYTHONPATH"] = str(os.path.dirname(__file__))  # 현재 루트 경로 명시
-#         subprocess.Popen(["python", scheduler_path], env=env)
-#         logger.info("스케줄러가 백그라운드에서 실행되었습니다.")
-#     except Exception as e:
-#         logger.error(f"스케줄러 실행 실패: {e}")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        scheduler_path = os.path.join(os.path.dirname(__file__), "api", "scheduler.py")
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(os.path.dirname(__file__))  # 현재 루트 경로 명시
+        subprocess.Popen(["python", scheduler_path], env=env)
+        logger.info("스케줄러가 백그라운드에서 실행되었습니다.")
+    except Exception as e:
+        logger.error(f"스케줄러 실행 실패: {e}")
 
 #     yield  # 서버가 실행됨
 #     logger.info("FastAPI 서버 종료")
 
 
-# app = FastAPI(lifespan=lifespan)
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
+# app = FastAPI()
 
-# 라우터 등 다른 코드 아래에 정의
-@app.get("/ping")
-def ping():
-    return {"message": "pong"}
+@app.get("/health-check")
+def healthCheck():
+    return "ok"
 
 # ─── 공통 응답 스키마 ──────────────────────
 class RecommendResponse(BaseModel):
