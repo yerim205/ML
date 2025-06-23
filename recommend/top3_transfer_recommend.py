@@ -3,9 +3,11 @@ from pathlib import Path
 from joblib import load
 import pandas as pd
 from recommend.hybrid_scheduler import HybridScheduler
-from utils.preprocess import parse_model1_input, parse_bed_status_counts
+from utils.preprocess import parse_model1_input
 
 from utils.db_loader import get_latest_realtime_data
+from recommend.hybrid_scheduler import EDGES_BY_ICD, RAW_PRIORITY_WEIGHTS
+from utils.ncp_client import download_file_from_ncp 
 
 CODE_TO_ICD = {
     "01": "I21",
@@ -15,8 +17,20 @@ CODE_TO_ICD = {
     "05": "I71",
 }
 # ─── 모델 로드 ─────────────────────
-MODEL_PATH = Path(__file__).parent.parent / "model/model1.pkl"
-model: HybridScheduler = load(MODEL_PATH)
+# MODEL_PATH = Path(__file__).parent.parent / "model/model1.pkl"
+# model: HybridScheduler = load(MODEL_PATH)
+
+ROOT = Path(__file__).parent.parent
+LOCAL_MODEL_PATH = ROOT / "model" / "model1.pkl"
+NCP_MODEL_KEY = "rmrp-models/model1.pkl"
+
+# ─── 모델 로딩 함수 ─────────────────────────
+def load_transfer_model() -> HybridScheduler:
+    if not LOCAL_MODEL_PATH.exists():
+        print("모델1 로컬에 없음 → NCP에서 다운로드 중")
+        download_file_from_ncp(NCP_MODEL_KEY, str(LOCAL_MODEL_PATH))
+
+    return load(LOCAL_MODEL_PATH)  
 
 def auto_transfer_recommend(icd_code: str) -> dict:
     """
@@ -53,6 +67,7 @@ def auto_transfer_recommend(icd_code: str) -> dict:
         print("병상 수 요약:\n", df_live[["ward", "embdCct", "dschCct", "useSckbCnt", "admsApntCct", "chupCct", "total_beds"]])
 
         # 3. 모델 기반 추천 시도
+        model = load_transfer_model()
 
         ranked = model.recommend(icd=icd_code, df_live=df_live, top_k=3)
         print("모델 추천 결과:", ranked)

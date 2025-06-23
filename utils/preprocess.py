@@ -1,4 +1,5 @@
 # utils/preprocess.py
+import pandas as pd
 
 # ─── 병동 코드 목록 ─────────────────────────────
 MODEL1_WARD_CODES = {
@@ -143,3 +144,19 @@ def generate_model2_features(df_today, df_lag1, df_lag7, target_date):
         'wardCd', 'free_beds', 'occ_rate', 'occupancy_change',
         'occ_rate_lag1', 'occ_rate_lag7', 'is_weekend'
     ]].copy()
+
+
+def preprocess(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    # ward_code 인코딩: 문자열 → 정수 (범주형 인코딩)
+    if df["ward_code"].dtype == object or str(df["ward_code"].dtype).startswith("category"):
+        df["ward_code"] = df["ward_code"].astype("category").cat.codes
+
+    # 혼잡도 관련 피처 결측값 처리
+    if "occ_rate_7d_ago" in df.columns:
+        mean_val = df["occ_rate_7d_ago"].mean()
+        df["occ_rate_7d_ago"].fillna(mean_val, inplace=True)
+
+    # 나머지 결측치는 모두 0으로
+    df.fillna(0, inplace=True)

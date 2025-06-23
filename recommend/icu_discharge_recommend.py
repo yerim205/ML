@@ -1,3 +1,4 @@
+#recommend/icu_discharge_recommend.py
 from utils.db_loader import (
     get_latest_realtime_data,
     get_latest_realtime_data_for_days_ago,
@@ -10,13 +11,22 @@ from datetime import datetime
 from catboost import Pool
 import pandas as pd
 
+from utils.ncp_client import download_file_from_ncp
+
 # ─── 모델 경로 상수 ─────────────────────────
+# ROOT = Path(__file__).parent.parent
+# MODEL_PATH = ROOT / "model" / "model3.pkl"
 ROOT = Path(__file__).parent.parent
-MODEL_PATH = ROOT / "model" / "model3.pkl"
+LOCAL_MODEL_PATH = ROOT / "model" / "model3.pkl"
+NCP_MODEL_KEY = "rmrp-models/model3.pkl"  
 
 # ─── 모델 로딩 ──────────────────────────────
 def load_discharge_model():
-    model_data = load(MODEL_PATH)
+    if not LOCAL_MODEL_PATH.exists():
+        print("로컬에 model3 없음 → NCP에서 다운로드 중...")
+        download_file_from_ncp(NCP_MODEL_KEY, str(LOCAL_MODEL_PATH))
+
+    model_data = load(LOCAL_MODEL_PATH)
     return (
         model_data["cat_model"],
         model_data["scaler"],

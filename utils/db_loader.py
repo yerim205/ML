@@ -4,23 +4,37 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text, URL
 from datetime import datetime, timedelta
 from datetime import date, timedelta, time
-from sqlalchemy import cast, DateTime
+from sqlalchemy import cast
+import pandas as pd
 
 load_dotenv()
+# .env에서 DATABASE_URL 직접 불러오기
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from pathlib import Path
+import os
 
-DB_URL  = os.getenv("DB_URL")
-DB_PORT = os.getenv("DB_PORT")
-DB_USER = os.getenv("DB_USER")
-DB_PW   = os.getenv("DB_PW")
+# 환경변수 로드
+ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=ROOT / ".env")
 
-URL_OBJ = URL.create(
-    drivername="mysql+pymysql",
-    username=DB_USER,
-    password=DB_PW,
-    host=DB_URL,
-    port=DB_PORT,
-)
-engine  = create_engine(URL_OBJ, future=True)
+# URL 한 줄로 로딩
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL, future=True)
+
+# DB_URL  = os.getenv("DB_URL")
+# DB_PORT = os.getenv("DB_PORT")
+# DB_USER = os.getenv("DB_USER")
+# DB_PW   = os.getenv("DB_PW")
+
+# URL_OBJ = URL.create(
+#     drivername="mysql+pymysql",
+#     username=DB_USER,
+#     password=DB_PW,
+#     host=DB_URL,
+#     port=DB_PORT,
+# )
+# engine  = create_engine(URL_OBJ, future=True)
 
 def get_latest_realtime_data() -> dict:
     query = text("""
@@ -207,5 +221,35 @@ def safe_get_realtime_data_for_today():
         print("_timestamp가 누락되어 있음")
         return [latest_data]
     
-
+#retrian에서 사용하는 것 >> n일 전 데이터전체 로그 긁어오기
+def get_api_logs_raw(days: int) -> pd.DataFrame:
+    query = text("""
+        SELECT ctnt, reg_dtm
+          FROM rmrp_portal.tb_api_log
+         WHERE req_res = 'REQ'
+           AND reg_dtm >= NOW() - INTERVAL :d DAY
+           AND com_src_cd = 'CMC03'
+    """)
+    with engine.connect() as conn:
+        return pd.read_sql(query, conn, params={"d": days})
     
+def preprocess(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    # ward_code 인코딩: 범주형 → 숫자형
+    if df["ward_code"].dtype == object or str(df["ward_code"].dtype).startswith("category"):
+        df["ward_code"] = df["ward_code"].astype("category").cat.codes
+
+    # occ_rate_7d_ago: 결측치 처리
+    if "occ_rate_7d_ago" in df.columns:
+        mean_value = df["occ_rate_7d_ago"].mean()
+        df["occ_rate_7d_ago"].fillna(mean_value, inplace=True)
+
+    # 그 외 수치형 결측치도 0으로 처리
+    df.fillna(0, inplace=True)
+
+    # 컬럼 순서 정리 (선택)
+    expected_cols = ["ward_code", "total_beds", "occupied_beds", "occ_rate_7d_ago"]
+    df = df[[col for col in expected_cols if col in df.columns]]
+
+    return df

@@ -138,3 +138,16 @@ class HybridScheduler:
             ranked = sorted(fallback_scores.items(), key=lambda x: x[1], reverse=True)
 
         return ranked[:top_k]
+
+
+    def update_feedback(self, feedback_list: list):
+        for icd, ward in feedback_list:
+            if (icd, ward) in self.raw_pw:
+                current = self.raw_pw[(icd, ward)]
+                updated = apply_weight_update(current, 1.0)  # 새로운 피드백은 weight=1.0으로 반영
+                self.raw_pw[(icd, ward)] = updated
+            else:
+                # 새로운 pair인 경우 기본값으로 시작
+                self.raw_pw[(icd, ward)] = 0.5
+
+        self.pw = normalize(self.raw_pw)  # normalize 다시 적용

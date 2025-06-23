@@ -1,83 +1,62 @@
 # retrain/icu_congestion_retrain.py
+import sys
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 import os
-import pickle
+import joblib
 import shutil
-import tempfile
-import json
+import logging, json
 from pathlib import Path
 from datetime import datetime, timezone
 
 import pandas as pd
-from sqlalchemy import create_engine, text, URL
 from dotenv import load_dotenv
+from catboost import CatBoostClassifier
 
-# ─── 환경 설정 ─────────────────
-# ARCHIVE_MODEL_DIR = Path(os.getenv("ARCHIVE_MODEL_DIR", "./data/archive/models"))
+from utils.db_loader import get_api_logs_raw  # 새로 추가한 함수
+from utils.preprocess import (
+    parse_model23_input,
+    preprocess
+)
+
+# ─── 환경 설정 ─────────────────────────────
 ROOT = Path(__file__).parent.parent
 load_dotenv(dotenv_path=ROOT / ".env")
 
-DB_URL  = os.getenv("DB_URL")
-DB_PORT = os.getenv("DB_PORT")
-DB_USER = os.getenv("DB_USER")
-DB_PW   = os.getenv("DB_PW")
+ARCHIVE_MODEL_DIR = Path(os.getenv("ARCHIVE_MODEL_DIR", "./data/archive/models"))
+MODEL_PATH = ROOT / "model" / "model2.pkl"
+MODEL_PATH.parent.mkdir(exist_ok=True, parents=True)
 
-URL_OBJ = URL.create(
-    drivername="mysql+pymysql",
-    username=DB_USER,
-    password=DB_PW,
-    host=DB_URL,
-    port=DB_PORT,
-)
-engine  = create_engine(URL_OBJ, future=True)
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-# ─── 컬럼 매핑 ─────────────────
-from utils.column_mapping import COLUMN_MAPPING
-from utils.preprocess import preprocess
-
-
-MODEL_DIR  = ROOT / "model"
-MODEL_PATH = MODEL_DIR / "icu_congestion.pkl"
-MODEL_DIR.mkdir(exist_ok=True, parents=True)
-
-def fetch_log_ctnt(days: int) -> pd.DataFrame:
-    sql = """
-    SELECT ctnt
-      FROM rmrp_portal.tb_api_log
-     WHERE req_res = 'REQ'
-       AND reg_dtm >= NOW() - INTERVAL :d DAY
-       AND com_src_cd = 'CMC03'
-    """
-    return pd.read_sql(text(sql), engine, params={"d": days})
-
+# ─── 메인 재학습 함수 ───────────────────────
 def model2_retrain():
-    # ── 1) 최근 1일치 로그 파싱 ──
-    raw_ctnts = fetch_log_ctnt(days=1)
-    records = []
-    for ct in raw_ctnts["ctnt"]:
-        try:
-            j = json.loads(ct)
-        except json.JSONDecodeError:
-            continue
-        rt = datetime.strptime(j["trasNo"], "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
-        for info in j.get("ptrmInfo", []):
-            for pt in info.get("ptntDtlsCtrlAllLst", []):
-                for ward in pt.get("wardLst", []):
-                    records.append({
-                        "wardCd":      ward.get("wardCd"),
-                        "embdCct":     ward.get("embdCct",0),
-                        "dschCct":     ward.get("dschCct",0),
-                        "useSckbCnt":  ward.get("useSckbCnt",0),
-                        "admsApntCct": ward.get("admsApntCct",0),
-                        "chupCct":     ward.get("chupCct",0),
-                        "record_time": rt,
-                    })
-    df = pd.DataFrame(records)
-    if df.empty:
-        print("No data to retrain.")
+    logger.info("ICU 혼잡도 모델 재학습 시작")
+
+    raw_df = get_api_logs_raw(days=1)
+    if raw_df.empty:
+        logger.warning(" 병상 API 로그 데이터가 없습니다.")
         return
 
-    # ── 2) 7일 전 평균 점유율 ──
+    records = []
+    for ct, reg_dtm in zip(raw_df["ctnt"], raw_df["reg_dtm"]):
+        try:
+            j = json.loads(ct)
+            j["_timestamp"] = reg_dtm.replace(tzinfo=timezone.utc)
+            records.extend(parse_model23_input(j))
+        except Exception as e:
+            logger.warning(f"⚠️ JSON 파싱 실패: {e}")
+            continue
+
+    df = pd.DataFrame(records)
+    if df.empty:
+        logger.warning("파싱된 병상 데이터가 없습니다.")
+        return
+
+    # ── 1. 7일 평균 혼잡도 생성 ─────────────────
     hist7 = (
         df.assign(total=lambda x: x.embdCct + x.dschCct + x.useSckbCnt + x.admsApntCct + x.chupCct)
           .eval("occ_rate = embdCct / total")
@@ -88,21 +67,18 @@ def model2_retrain():
     )
     df = df.merge(hist7, on="wardCd", how="left")
 
-    # ── 3) total_beds 계산 ──
-    df["total_beds"] = df.embdCct + df.dschCct + df.useSckbCnt + df.admsApntCct + df.chupCct
-    df.drop(columns=["embdCct","dschCct","useSckbCnt","admsApntCct","chupCct"], inplace=True)
+    # ── 2. 피처 및 타깃 생성 ───────────────────
+    df["total_beds"] = df[["embdCct", "dschCct", "useSckbCnt", "admsApntCct", "chupCct"]].sum(axis=1)
+    df["occupied_beds"] = df["useSckbCnt"]
 
-    # ── 4) 컬럼 매핑 ──
-    df.rename(columns=COLUMN_MAPPING, inplace=True)
-
-    # ── 5) 타깃 생성 ──
     df["congestion_flag"] = (df.occupied_beds / df.total_beds > 0.9).astype(int)
     y = df.pop("congestion_flag")
 
-    # ── 6) 전처리 및 학습 ──
+    # ── 3. 전처리 ───────────────────────────────
     X = preprocess(df)
-    from catboost import CatBoostClassifier
     cat_idx = [X.columns.get_loc("ward_code")]
+
+    # ── 4. 모델 학습 ────────────────────────────
     model = CatBoostClassifier(
         depth=6,
         iterations=400,
@@ -114,16 +90,17 @@ def model2_retrain():
     )
     model.fit(X, y)
 
-    # ── 7) 저장 및 아카이브 ──
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pkl")
-    pickle.dump(model, tmp); tmp.flush()
-    MODEL_PATH.parent.mkdir(exist_ok=True, parents=True)
-    shutil.move(tmp.name, MODEL_PATH)
+    # ── 5. 저장 및 아카이브 ─────────────────────
+    joblib.dump({"models": [model]}, MODEL_PATH)
+
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    (ARCHIVE_MODEL_DIR / f"icu_congestion_{ts}.pkl").parent.mkdir(exist_ok=True, parents=True)
-    shutil.copy(MODEL_PATH, ARCHIVE_MODEL_DIR / f"icu_congestion_{ts}.pkl")
+    archive_path = ARCHIVE_MODEL_DIR / f"icu_congestion_{ts}.pkl"
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(MODEL_PATH, archive_path)
 
-    print("ICU Congestion retrain success:", MODEL_PATH)
+    logger.info(f"재학습 완료: {MODEL_PATH}")
+    logger.info(f"아카이브 저장 완료: {archive_path}")
 
+# ─── 스크립트 실행 시 ───────────────────────
 if __name__ == "__main__":
-    retrain_icu_congestion()
+    model2_retrain()
