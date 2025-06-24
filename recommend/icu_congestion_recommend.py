@@ -56,6 +56,10 @@ def auto_congestion_recommend(_: dict) -> dict:
 
         # ─── (4) 유효성 검사 ─────────────────────
         if df_today.empty or df_lag1.empty or df_lag7.empty:
+            # 2025-06-24(화) -> 있는거 검사해서 1일전 7일전 데이터 대체 (임시)
+            # <ex> today 데이터만 있고 1, 7일 전 데이터가 없으면 today 데이터를 1, 7일 전 데이터로 사용
+            # <ex> 1일 전 데이터만 있고 today, 7일 전 데이터가 없으면 1일 전 데이터를 today, 7일 전 데이터로 사용
+            # <ex> today, 1일 전 데이터만 있고 7일 전 데이터가 없으면 1일 전 데이터를 7일 전 데이터로 사용(과거 데이터는 과거와 가장 가까운 시점의 데이터로 사용)
             return {
                 "success": False,
                 "result": {

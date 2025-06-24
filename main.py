@@ -135,7 +135,7 @@ async def recommend_congestion():
 
     except Exception as e:
         return JSONResponse(
-            status_code=500,
+            status_code=200,
             content={
                 "success": False,
                 "result": {
@@ -161,7 +161,7 @@ async def recommend_discharge():
         )
     except Exception as e:
         return JSONResponse(
-            status_code=500,
+            status_code=200,
             content={
                 "success": False,
                 "result": {
