@@ -6,10 +6,11 @@ import pandas as pd
 import traceback
 from catboost import Pool
 import numpy as np  
-import joblib
 
 from utils.ncp_client import download_file_from_ncp
 
+import logging
+logger = logging.getLogger(__name__)
 
 from utils.db_loader import (
     get_realtime_data_for_today,
@@ -54,19 +55,59 @@ def auto_congestion_recommend(_: dict) -> dict:
         df_lag7 = pd.DataFrame([row for d in lag7_jsons for row in parse_model23_input(d)])
         print(f"DataFrame shapes: today={df_today.shape}, lag1={df_lag1.shape}, lag7={df_lag7.shape}")
 
+<<<<<<< HEAD
         # ─── (4) 유효성 검사 ─────────────────────
         if df_today.empty or df_lag1.empty or df_lag7.empty:
             # 2025-06-24(화) -> 있는거 검사해서 1일전 7일전 데이터 대체 (임시)
             # <ex> today 데이터만 있고 1, 7일 전 데이터가 없으면 today 데이터를 1, 7일 전 데이터로 사용
             # <ex> 1일 전 데이터만 있고 today, 7일 전 데이터가 없으면 1일 전 데이터를 today, 7일 전 데이터로 사용
             # <ex> today, 1일 전 데이터만 있고 7일 전 데이터가 없으면 1일 전 데이터를 7일 전 데이터로 사용(과거 데이터는 과거와 가장 가까운 시점의 데이터로 사용)
+=======
+        # # ─── (4) 유효성 검사 ─────────────────────
+        # if df_today.empty or df_lag1.empty or df_lag7.empty:
+        #     return {
+        #         "success": False,
+        #         "result": {
+        #             "message": "입력 데이터 중 하나 이상이 비어 있습니다.",
+        #             "prediction": None
+        #         }
+        #     }
+        # ─── (4) 유효성 검사 및 백업 ─────────────────────
+# 조기 리턴 없이, 각 df 비었을 때 대체하는 구조
+        if df_today.empty and df_lag1.empty and df_lag7.empty:
+>>>>>>> 4d830c42 (.)
             return {
-                "success": False,
-                "result": {
-                    "message": "입력 데이터 중 하나 이상이 비어 있습니다.",
-                    "prediction": None
-                }
-            }
+        "success": False,
+        "result": {
+            "message": "today, lag1, lag7 데이터 모두 비어 있음 → 예측 불가",
+            "prediction": None
+        }
+    }
+
+# 있으면 최대한 대체
+        if df_today.empty:
+            if not df_lag1.empty:
+                logger.warning("today 없음 → lag1으로 대체")
+                f_today = df_lag1.copy()
+            elif not df_lag7.empty:
+                logger.warning("today 없음 → lag7으로 대체")
+                df_today = df_lag7.copy()
+
+        if df_lag1.empty:
+            if not df_today.empty:
+                logger.warning("lag1 없음 → today로 대체")
+                df_lag1 = df_today.copy()
+            elif not df_lag7.empty:
+                logger.warning("lag1 없음 → lag7으로 대체")
+                df_lag1 = df_lag7.copy()
+
+        if df_lag7.empty:
+            if not df_lag1.empty:
+                logger.warning("lag7 없음 → lag1으로 대체")
+                df_lag7 = df_lag1.copy()
+            elif not df_today.empty:
+                logger.warning("lag7 없음 → today로 대체")
+                df_lag7 = df_today.copy()
 
         # ─── (5) 피처 생성 ──────────────────────
         target_date = datetime.now()

@@ -9,6 +9,14 @@ from utils.db_loader import get_latest_realtime_data
 from recommend.hybrid_scheduler import EDGES_BY_ICD, RAW_PRIORITY_WEIGHTS
 from utils.ncp_client import download_file_from_ncp 
 
+
+import os
+import logging
+from io import BytesIO
+from dotenv import load_dotenv
+
+from utils import ncp_client
+
 import os
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")  # 루트의 .env 명시적으로 로드
@@ -25,17 +33,33 @@ CODE_TO_ICD = {
 # MODEL_PATH = Path(__file__).parent.parent / "model/model1.pkl"
 # model: HybridScheduler = load(MODEL_PATH)
 
+# ROOT = Path(__file__).parent.parent
+# LOCAL_MODEL_PATH = ROOT / "model" / "model1.pkl"
+# NCP_MODEL_KEY = "rmrp-models/model1.pkl"
+
+# # ─── 모델 로딩 함수 ─────────────────────────
+# def load_transfer_model() -> HybridScheduler:
+#     if not LOCAL_MODEL_PATH.exists():
+#         print("모델1 로컬에 없음 → NCP에서 다운로드 중")
+#         download_file_from_ncp(NCP_MODEL_KEY, str(LOCAL_MODEL_PATH))
+
+#     return load(LOCAL_MODEL_PATH)  
+
 ROOT = Path(__file__).parent.parent
-LOCAL_MODEL_PATH = ROOT / "model" / "model1.pkl"
-NCP_MODEL_KEY = "rmrp-models/model1.pkl"
+load_dotenv(dotenv_path=ROOT / ".env")
 
-# ─── 모델 로딩 함수 ─────────────────────────
-def load_transfer_model() -> HybridScheduler:
-    if not LOCAL_MODEL_PATH.exists():
-        print("모델1 로컬에 없음 → NCP에서 다운로드 중")
-        download_file_from_ncp(NCP_MODEL_KEY, str(LOCAL_MODEL_PATH))
+NCP_MODEL3_KEY = os.getenv("NCP_MODEL3_KEY", "rmrp-models/model3.pkl")
 
-    return load(LOCAL_MODEL_PATH)  
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# ─── NCP에서 바로 모델을 로드 ────────────────────
+def load_model_from_ncp_direct(ncp_key: str):
+    logger.info(f"NCP에서 모델 직접 다운로드 중: {ncp_key}")
+    byte_data = ncp_client.get_object_bytes(ncp_key)  # 바이트로 가져오는 함수 구현되어 있어야 함
+    model_data = load(BytesIO(byte_data))
+    return model_data
+
 
 def auto_transfer_recommend(icd_code: str) -> dict:
     """
@@ -72,8 +96,8 @@ def auto_transfer_recommend(icd_code: str) -> dict:
         print("병상 수 요약:\n", df_live[["ward", "embdCct", "dschCct", "useSckbCnt", "admsApntCct", "chupCct", "total_beds"]])
 
         # 3. 모델 기반 추천 시도
-        model = load_transfer_model()
-
+        # model = load_transfer_model()
+        model = model_data
         ranked = model.recommend(icd=icd_code, df_live=df_live, top_k=3)
         print("모델 추천 결과:", ranked)
         print(" >> 추천 후보군 (점수 있는 ward 수):", len(ranked))
