@@ -32,61 +32,27 @@ URL_OBJ = URL.create(
 )
 engine  = create_engine(URL_OBJ, future=True)
 
-# def get_latest_realtime_data() -> dict:
-#     query = text("""
-#         SELECT ctnt, reg_dtm
-#           FROM rmrp_portal.tb_api_log
-#          WHERE req_res = 'REQ'
-#            AND com_src_cd = 'CMC03'
-#            AND req_url LIKE '%mdcl-rm-rcpt%'
-#          ORDER BY reg_dtm DESC
-#          LIMIT 1
-#     """)
+def get_latest_realtime_data() -> dict:
+    query = text("""
+        SELECT ctnt, reg_dtm
+          FROM rmrp_portal.tb_api_log
+         WHERE req_res = 'REQ'
+           AND com_src_cd = 'CMC03'
+           AND req_url LIKE '%mdcl-rm-rcpt%'
+         ORDER BY reg_dtm DESC
+         LIMIT 1
+    """)
 
-#     with engine.connect() as conn:
-#         row = conn.execute(query).fetchone()
-#         if not row or not row[0]:
-#             raise ValueError("DB에 유효한 ctnt 데이터가 없습니다.")
-#         try:
-#             data = json.loads(row[0])
-#             data["_timestamp"] = row[1]  # reg_dtm 기반 시간 추가
-#             return data
-#         except json.JSONDecodeError as e:
-#             raise ValueError(f"JSON 파싱 실패: {e}")
-def get_latest_realtime_data(max_days: int = 7) -> dict:
-    """
-    최근 max_days일 안에서 유효한 ctnt가 있는 병상 데이터를 조회하여 반환
-    """
-    for days_ago in range(max_days):
-        date_target = (datetime.today() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-        query = text(f"""
-            SELECT ctnt, reg_dtm
-              FROM rmrp_portal.tb_api_log
-             WHERE req_res = 'REQ'
-               AND com_src_cd = 'CMC03'
-               AND req_url LIKE '%mdcl-rm-rcpt%'
-               AND DATE(reg_dtm) = '{date_target}'
-             ORDER BY reg_dtm DESC
-             LIMIT 1
-        """)
-
-        with engine.connect() as conn:
-            row = conn.execute(query).fetchone()
-            if not row or not row[0]:
-                continue  # 다음 날짜로
-
-            try:
-                data = json.loads(row[0])
-                parsed = parse_model1_input(data)
-                if parsed:  # 파싱 성공 & 병상 데이터가 존재하면
-                    data["_timestamp"] = row[1]
-                    print(f"기준 날짜: {date_target}, 데이터 있음")
-                    return data
-            except json.JSONDecodeError:
-                continue
-
-    print("최근 {max_days}일 이내 유효한 병상 데이터 없음")
-    return {}
+    with engine.connect() as conn:
+        row = conn.execute(query).fetchone()
+        if not row or not row[0]:
+            raise ValueError("DB에 유효한 ctnt 데이터가 없습니다.")
+        try:
+            data = json.loads(row[0])
+            data["_timestamp"] = row[1]  # reg_dtm 기반 시간 추가
+            return data
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON 파싱 실패: {e}")
 
 def get_realtime_data_for_today() -> list[dict]:
     today = datetime.now().date()
