@@ -95,7 +95,7 @@ async def recommend_transfer(req: ICDRequest):
 
     except Exception as e:
         return JSONResponse(
-            status_code=500,
+            status_code=200,
             content={
                 "success": False,
                 "result": {
