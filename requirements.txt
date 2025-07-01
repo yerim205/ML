@@ -1,0 +1,28 @@
+# 통합된 requirements.txt
+
+# Core ML & Data libraries
+numpy>=2.0.2,<=2.2.5
+pandas>=2.2.2,<=2.2.3
+scikit-learn==1.5.1
+catboost==1.2.8
+optuna==4.3.0
+imbalanced-learn==0.13.0
+
+# API frameworks
+fastapi==0.115.12
+uvicorn>=0.34.2,<=0.34.3
+python-dotenv==1.1.0
+
+# Database & scheduling
+SQLAlchemy==2.0.40
+pymysql==1.1.1
+APScheduler==3.10.4
+boto3>=1.38.35
+
+# Serialization & utilities
+joblib>=1.1.0
+cryptography==45.0.4
+
+# Model-specific notes:
+# icu_congestion & icu_discharge: use catboost, optuna, imbalanced-learn
+# top3_transfer: use pandas, joblib, fastapi
